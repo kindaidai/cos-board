@@ -1,0 +1,12 @@
+{
+  "name": "cos-board",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "volta": { "node": "24.1.0" },
+  "scripts": {
+    "start": "node bin/cos-board.js",
+    "test": "TZ=UTC node --test \"test/**/*.test.js\""
+  }
+}
