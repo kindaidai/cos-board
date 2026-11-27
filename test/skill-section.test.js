@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs';
 
 const parser = await import('../src/parse/skill-section.js').catch(() => null);
 const fixture = readFileSync(new URL('./fixtures/chief-of-staff.md', import.meta.url), 'utf8');
-const expected = '345f941c34f404f40eb9e43031e9e6a7c62d9994ccd4f04492a38759f678b799';
+import { SYNC_SECTION_SHA256 as expected } from '../src/contract.js';
+// fixture の同期節は実物の SKILL.md と同じ本文にし、契約のハッシュと一致させる
 function hash(text) {
   assert.ok(parser, '節ハッシュの解析が未実装');
   return parser.hashSyncSection(text);

@@ -11,7 +11,7 @@ export const COLUMNS = Object.freeze([
 export const STATE_COLUMN = Object.freeze({ [STATE.DRAFT]: COLUMN.DRAFTS, [STATE.WORKING]: COLUMN.WORKING, [STATE.USER]: COLUMN.USER, [STATE.EXTERNAL]: COLUMN.EXTERNAL, [STATE.DONE]: COLUMN.DONE, [STATE.LOST]: COLUMN.LOST });
 export const VALID_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,22}$/;
 export const VALID_WORKSPACE = /^[A-Za-z0-9]+$/;
-export const SYNC_SECTION_SHA256 = '345f941c34f404f40eb9e43031e9e6a7c62d9994ccd4f04492a38759f678b799';
+export const SYNC_SECTION_SHA256 = 'b47caee5e25ca794d39bf19a481c75dfd64ad6fddbff3779b0ecfe88df929113';
 export const SKILL_WARNING = 'CoS の判定表の更新、または読み取り失敗を検出しました。cos-board の判定を見直してください';
 
 /** @typedef {'下書き'|'作業中'|'あなた待ち'|'外部待ち'|'完了'|'迷子'} LedgerState */
