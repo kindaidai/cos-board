@@ -4,6 +4,23 @@ CoS の台帳・報告と Herdr の状態を読み、今どのタスクが何を
 
 Node.js 24 以上が必要です。依存パッケージやビルドはなく、`npm install` は不要です。
 
+## 起動
+
+ふだんは裏で起動します。CoS を立ち上げる `cos-up` もこれを呼ぶので、`cos-up` を使っていれば手で起動する必要はありません。
+
+```sh
+bin/cos-board-up          # 裏で起動する。もう動いていれば何もしない
+bin/cos-board-up --stop   # 裏で起動したボードを止める
+```
+
+- `/api/board` がボードの応答を返せば起動済みとみなし、二重に起動しません
+- ログと pid は `~/.local/state/cos-board/`（`board.log` と `board.pid`）に置きます。`COS_BOARD_STATE_DIR` で変えられます
+- ポートは `COS_BOARD_PORT`（既定 `4270`）で変えます。そのほかの引数は `bin/cos-board-up -- --cos-root ...` のように `--` の後ろに書きます
+- ポートを別のものが使っていると起動に失敗し、ログの末尾を表示します
+- `--stop` で止められるのは `bin/cos-board-up` で起動したボードだけです。`npm start` で起動したものは、その端末で止めてください
+
+端末の前面で動かすときは次のとおりです。
+
 ```sh
 npm start
 ```

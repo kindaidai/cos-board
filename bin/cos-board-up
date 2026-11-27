@@ -1,0 +1,63 @@
+#!/bin/bash
+# ボードを裏で起動する。もう動いていれば何もしない。
+#   cos-board-up [-- <cos-board.js の引数>]   起動（--port は使わず COS_BOARD_PORT で指定）
+#   cos-board-up --stop                       この script で起動したボードを止める
+# 環境変数:
+#   COS_BOARD_PORT       待ち受けポート（既定 4270）
+#   COS_BOARD_STATE_DIR  ログと pid の置き場所（既定 ~/.local/state/cos-board）
+set -euo pipefail
+repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+port="${COS_BOARD_PORT:-4270}"
+dir="${COS_BOARD_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/cos-board}"
+log="$dir/board.log"
+pidfile="$dir/board.pid"
+url="http://127.0.0.1:$port"
+
+# /api/board がボードの JSON を返すときだけ「動いている」とみなす
+alive() { curl -fsS --max-time 2 "$url/api/board" 2>/dev/null | grep -q '"refreshSeconds"'; }
+# pid ファイルの pid が、今もこのボードのプロセスなら出力する
+our_pid() {
+  [ -f "$pidfile" ] || return 0
+  local pid; pid="$(cat "$pidfile")"
+  [[ "$pid" =~ ^[0-9]+$ ]] || return 0
+  ps -p "$pid" -o command= 2>/dev/null | grep -q 'cos-board\.js' && echo "$pid"
+  return 0
+}
+
+if [ "${1:-}" = --stop ]; then
+  pid="$(our_pid)"
+  if [ -z "$pid" ]; then
+    rm -f "$pidfile"
+    if alive; then echo "$url のボードはこの script で起動したものではありません。起動した端末で止めてください" >&2; exit 1; fi
+    echo "ボードは動いていません"; exit 0
+  fi
+  kill "$pid"
+  for _ in $(seq 50); do ps -p "$pid" > /dev/null 2>&1 || break; sleep 0.1; done
+  rm -f "$pidfile"
+  echo "ボードを止めました（pid ${pid}）"; exit 0
+fi
+case "${1:-}" in
+  "") ;;
+  --) shift ;;
+  *) echo "usage: cos-board-up [--stop | -- <cos-board.js の引数>]" >&2; exit 2 ;;
+esac
+
+if alive; then echo "ボードは起動済みです: $url"; exit 0; fi
+
+mkdir -p "$dir"
+printf '\n== %s 起動 port=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$port" >> "$log"
+# cd するのは、volta が package.json の node の版を使うため
+(cd "$repo" && exec nohup node bin/cos-board.js --port "$port" "$@" >> "$log" 2>&1 < /dev/null) &
+pid=$!
+echo "$pid" > "$pidfile"
+
+for _ in $(seq 50); do
+  if alive; then echo "ボードを起動しました: ${url}（pid ${pid}、ログ ${log}）"; exit 0; fi
+  ps -p "$pid" > /dev/null 2>&1 || break
+  sleep 0.1
+done
+kill "$pid" 2>/dev/null || true
+rm -f "$pidfile"
+echo "ボードを起動できませんでした。ログ: $log" >&2
+tail -n 3 "$log" >&2
+exit 1
