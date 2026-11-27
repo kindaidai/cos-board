@@ -29,7 +29,7 @@ export function createApp({readBoard, herdr, assets = {}, now = Date.now, checkS
         return send(res,200,skill && !skill.ok ? {...value, alerts:[...value.alerts, {level:'warn', message:SKILL_WARNING}]} : value);
       }
       if (req.method === 'GET' && Object.hasOwn(assets,path)) return send(res,200,assets[path].body,assets[path].type);
-      if (req.method !== 'POST' || path !== '/api/focus') return send(res,404,{error:'見つかりません'});
+      if (req.method !== 'POST' || !['/api/focus','/api/close'].includes(path)) return send(res,404,{error:'見つかりません'});
       if (req.headers.origin && !hosts.map(host=>`http://${host}`).includes(req.headers.origin)) return send(res,403,{error:'Origin が不正です'});
       if (req.headers['content-type']?.split(';')[0].trim().toLowerCase() !== 'application/json') return send(res,400,{error:'application/json が必要です'});
       const chunks = []; let length = 0;
@@ -41,16 +41,28 @@ export function createApp({readBoard, herdr, assets = {}, now = Date.now, checkS
       let input;
       try {input = JSON.parse(Buffer.concat(chunks).toString('utf8'));} catch {return send(res,400,{error:'JSON が不正です'});}
       if (typeof input?.workspaceId !== 'string' || !VALID_WORKSPACE.test(input.workspaceId)) return send(res,400,{error:'workspaceId が不正です'});
-      // キャッシュではなく現在の一覧で確認し、閉じたworkspaceへは送らない。
-      const listed = await herdr.list('workspace');
-      if (!listed.ok) return send(res,502,{error:listed.reason});
-      const workspaces = parseHerdr(listed.stdout,'workspaces');
-      if (workspaces.errors.length) return send(res,502,{error:workspaces.errors[0].message});
-      if (!workspaces.value.some(w=>w.workspace_id === input.workspaceId)) return send(res,404,{error:'workspace が見つかりません'});
-      const result = await herdr.focus(input.workspaceId);
+      const id = input.workspaceId;
+      let result;
+      if (path === '/api/focus') {
+        // キャッシュではなく現在の一覧で確認し、閉じたworkspaceへは送らない。
+        const listed = await herdr.list('workspace');
+        if (!listed.ok) return send(res,502,{error:listed.reason});
+        const workspaces = parseHerdr(listed.stdout,'workspaces');
+        if (workspaces.errors.length) return send(res,502,{error:workspaces.errors[0].message});
+        if (!workspaces.value.some(w=>w.workspace_id === id)) return send(res,404,{error:'workspace が見つかりません'});
+        result = await herdr.focus(id);
+      } else {
+        // キャッシュを使わず今の台帳と一覧で判定し、台帳で完了したタスクの workspace だけを閉じる。
+        const current = await readBoard();
+        const closable = current.columns.flatMap(c => c.cards).some(c => c.kind === 'task' && c.canClose && c.workspace?.id === id);
+        if (!closable) return send(res,409,{error:'閉じられるのは、台帳で完了したタスクの workspace だけです'});
+        result = await herdr.close(id);
+        cached = null;
+      }
+      const verb = path === '/api/focus' ? 'focus' : 'close';
       if (!result.ok) return send(res,502,{error:result.reason});
       try {
-        if (JSON.parse(result.stdout)?.error) return send(res,502,{error:'Herdr の focus が失敗しました'});
+        if (JSON.parse(result.stdout)?.error) return send(res,502,{error:`Herdr の ${verb} が失敗しました`});
       } catch {return send(res,502,{error:'Herdr の応答を解釈できません'});}
       return send(res,204);
     } catch (error) {

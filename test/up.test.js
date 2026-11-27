@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
-import { readFile, mkdtemp, rm } from 'node:fs/promises';
+import { readFile, writeFile, chmod, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,7 +29,11 @@ async function setup(t) {
   const stateDir = await mkdtemp(join(tmpdir(), 'cos-board-up-'));
   t.after(() => rm(stateDir, {recursive:true, force:true}));
   const port = await freePort();
-  const env = {...f.env, COS_BOARD_PORT:String(port), COS_BOARD_STATE_DIR:stateDir};
+  // volta のシムと同じく、本物の node を子プロセスとして起動する偽の node を PATH の先頭に置く
+  const shim = join(stateDir, 'node');
+  await writeFile(shim, `#!/bin/bash\n"${process.execPath}" "$@" &\nwait\n`);
+  await chmod(shim, 0o755);
+  const env = {...f.env, PATH:`${stateDir}:${process.env.PATH}`, COS_BOARD_PORT:String(port), COS_BOARD_STATE_DIR:stateDir};
   const args = ['--', '--cos-root', f.root, '--herdr', fakeHerdr, '--skill-path', skill];
   t.after(() => run(['--stop'], env));
   return {env, args, port, stateDir};
@@ -41,6 +45,9 @@ test('裏で起動し、2 回目は二重に起動せず、--stop で止まる',
   assert.equal(first.code, 0, first.stderr);
   assert.match(first.stdout, new RegExp(`起動しました.*http://127\\.0\\.0\\.1:${s.port}`));
   const pid = (await readFile(join(s.stateDir, 'board.pid'), 'utf8')).trim();
+  // volta のシム経由で起動すると子の node がポートを持つ。止める対象はポートを持つ方
+  const listener = await new Promise(resolve => execFile('lsof', ['-nP', '-t', `-iTCP:${s.port}`, '-sTCP:LISTEN'], (_e, out) => resolve(out.trim())));
+  assert.equal(pid, listener);
   const board = await (await fetch(`http://127.0.0.1:${s.port}/api/board`)).json();
   assert.equal(board.ledger.ok, true);
 

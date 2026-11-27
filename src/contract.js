@@ -18,7 +18,7 @@ export const SKILL_WARNING = 'CoS の判定表の更新、または読み取り�
 /** @typedef {'your-turn'|'working'|'external'|'done'|'lost'|'unlisted'} ColumnKey */
 /** @typedef {{seq:number, at:string, request:number, state:'working'|'need-user'|'need-external'|'done'|'note', pane:string, text:string}} Report */
 /** @typedef {{paneId:string, name:string|null, isLead:boolean, agent:string, status:'idle'|'working'|'blocked'|'done'|'unknown', cwd:string, title:string}} Pane */
-/** @typedef {{kind:'task', id:string, title:string, area:string, type:string, repos:string[], prs:string[], nextAction:string, state:LedgerState|null, ledgerState:LedgerState|null, ledgerStateRaw:string, basis:'herdr'|'report'|'ledger', rule:string, reason:string, needsCheck:string|null, badges:string[], latestReport:Report|null, latestNote:Report|null, updatedAt:string|null, updatedSource:'ledger'|'report'|null, ledgerUpdatedRaw:string, workspace:{id:string,number:number|null,present:boolean|null}|null, canFocus:boolean, panes:Pane[]}} TaskCard */
+/** @typedef {{kind:'task', id:string, title:string, area:string, type:string, repos:string[], prs:string[], nextAction:string, state:LedgerState|null, ledgerState:LedgerState|null, ledgerStateRaw:string, basis:'herdr'|'report'|'ledger', rule:string, reason:string, needsCheck:string|null, badges:string[], latestReport:Report|null, latestNote:Report|null, updatedAt:string|null, updatedSource:'ledger'|'report'|null, ledgerUpdatedRaw:string, workspace:{id:string,number:number|null,present:boolean|null}|null, canFocus:boolean, canClose:boolean, panes:Pane[]}} TaskCard */
 /** @typedef {{kind:'session', workspace:{id:string,number:number,label:string}, isCos:boolean, blocked:boolean, panes:Pane[]}} SessionCard */
 /** @typedef {{key:ColumnKey,title:string,available:boolean,cards:(TaskCard|SessionCard)[]}} Column */
 /** @typedef {{generatedAt:string,refreshSeconds:number,ledger:({ok:true,lastSync:string|null,limit:number|null,activeCount:number}|{ok:false,reason:string}),herdr:({ok:true}|{ok:false,reason:string}),alerts:{level:'error'|'warn',message:string}[],drafts:TaskCard[],columns:Column[]}} Board */
@@ -47,7 +47,7 @@ const task = object({kind: enumeration(['task']), id: string, title: string, are
   state: nullable(enumeration(Object.values(STATE))), ledgerState: nullable(enumeration(Object.values(STATE))), ledgerStateRaw: string,
   basis: enumeration(['herdr', 'report', 'ledger']), rule: string, reason: string, needsCheck: nullable(string), badges: array(string),
   latestReport: nullable(report), latestNote: nullable(report), updatedAt: nullable(timestamp), updatedSource: nullable(enumeration(['ledger', 'report'])),
-  ledgerUpdatedRaw: string, workspace: nullable(object({id: string, number: nullable(integer), present: nullable(boolean)})), canFocus: boolean, panes: array(pane)});
+  ledgerUpdatedRaw: string, workspace: nullable(object({id: string, number: nullable(integer), present: nullable(boolean)})), canFocus: boolean, canClose: boolean, panes: array(pane)});
 const session = object({kind: enumeration(['session']), workspace: object({id: string, number: integer, label: string}), isCos: boolean, blocked: boolean, panes: array(pane)});
 const card = (v, p, errors) => v?.kind === 'session' ? session(v, p, errors) : task(v, p, errors);
 const source = extra => (v, p, errors) => {

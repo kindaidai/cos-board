@@ -51,7 +51,14 @@ npm start -- --port 4271 --cos-root ~/develop/.cos --herdr /path/to/herdr
 
 表示中は取得完了から3秒後に次の取得を開始します。別タブに移ると止まり、戻ると再取得します。5秒で応答しなければ最後の表示を薄く残して接続失敗を知らせ、引き続き再試行します。時刻の解釈・表示は日本時間です。
 
-台帳・state.md・report.log・lead・cos.state は読み取り専用で、変更しません。symlinkや通常ファイルでない対象は開きません。Herdrへの操作はカードを押した際の `workspace focus <id>` だけです。IDの形式と現在の一覧を確認してから実行します。workspaceの記録が食い違うカードは開けません。
+台帳・state.md・report.log・lead・cos.state は読み取り専用で、変更しません。symlinkや通常ファイルでない対象は開きません。
+
+Herdr への操作は次の 2 つだけで、どちらもユーザーがボタンを押したときに限ります。
+
+- **開く**（`workspace focus <id>`）: カードを押したとき。IDの形式と現在の一覧を確認してから実行します。workspaceの記録が食い違うカードは開けません
+- **閉じる**（`workspace close <id>`）: 台帳の状態が「完了」で、記録どおりの workspace が残っているタスクのカードにだけボタンを出します。「閉じる」を押すと「閉じる（確定）」と「やめる」に変わり、確定を押したときだけ実行します。実行の直前に台帳と Herdr の一覧を読み直し、条件を満たさなければ閉じません（409）。台帳に無いセッションや、完了以外のカードには出しません
+
+閉じたことを CoS には知らせません。CoS が自分で workspace の消失に気付きます。ボードは CoS のディレクトリに書き込みません。
 
 Herdr の `workspace list` と `agent list` は並列に呼び、それぞれ2秒で打ち切ります。同時の取得要求は共有し、取得完了から1秒間は結果を再利用します。Herdrが使える端末の環境で起動してください。利用できない場合も台帳の状態とエラーを表示します。
 
@@ -71,7 +78,7 @@ node --input-type=module -e 'import {readFileSync} from "node:fs"; import {homed
 npm test
 ```
 
-フィクスチャだけで画面を確認できます。ここでのfocusは偽物のCLIにだけ届きます。
+フィクスチャだけで画面を確認できます。ここでのfocusとcloseは偽物のCLIにだけ届きます。
 
 ```sh
 npm start -- --port 0 --cos-root test/fixtures/cos --herdr test/fixtures/fake-herdr.js --skill-path test/fixtures/chief-of-staff.md

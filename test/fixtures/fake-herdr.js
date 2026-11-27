@@ -9,6 +9,9 @@ if (process.env.FAKE_HERDR_FAIL === args[0] || process.env.FAKE_HERDR_FAIL === '
 if (args[0] === 'workspace' && args[1] === 'focus' && args.length === 3) {
   if (process.env.FAKE_HERDR_FOCUS_FAIL) process.exit(1);
   console.log('{}');
+} else if (args[0] === 'workspace' && args[1] === 'close' && args.length === 3) {
+  if (process.env.FAKE_HERDR_CLOSE_FAIL) process.exit(1);
+  console.log('{}');
 } else if (args.length === 2 && args[1] === 'list' && ['workspace','agent'].includes(args[0])) {
   const kind = args[0] === 'workspace' ? 'workspaces' : 'agents';
   console.log(process.env[`FAKE_HERDR_${kind.toUpperCase()}`] ?? readFileSync(new URL(`./${kind}.json`, import.meta.url), 'utf8'));

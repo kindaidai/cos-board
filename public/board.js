@@ -1,5 +1,6 @@
 import { createPoller } from './poller.js';
 import { createFocusController } from './focus.js';
+import { createCloseController } from './close.js';
 
 const state = {data:null, fetchedAt:null, connected:null};
 const time = new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
@@ -42,6 +43,33 @@ const focusController = createFocusController({sendFocus, onChange:() => render(
 function focus(id) {
   if (!window.getSelection()?.isCollapsed) return;
   void focusController.focus(id);
+}
+async function sendClose(id) {
+  const feedback = document.getElementById('focus-status');
+  feedback.textContent = `Herdr の ${id} を閉じています…`;
+  try {
+    const response = await fetch('/api/close',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({workspaceId:id})});
+    if (!response.ok) {const data = await response.json();throw new Error(data.error || `HTTP ${response.status}`);}
+    feedback.textContent = `Herdr の ${id} を閉じました`;
+  } catch (error) {feedback.textContent = `閉じられません: ${error.message}`;}
+}
+const closeController = createCloseController({sendClose, onChange:() => render(state)});
+function closeButton(text, className, id, onClick) {
+  const button = element('button',`open-workspace close-workspace ${className}`,text);
+  button.type = 'button'; button.dataset.focusId = `${className}:${id}`;
+  button.addEventListener('click',event=>{event.stopPropagation();onClick();});
+  return button;
+}
+// 台帳で完了したタスクだけに出す。押したあと「閉じる（確定）」をもう一度押すまで送らない。
+function closeActions(id, label) {
+  const actions = element('div','close-actions');
+  if (closeController.isPending(id)) {
+    const button = closeButton('閉じています…','pending',id,()=>{}); button.disabled = true; actions.append(button);
+  } else if (closeController.isArmed(id)) {
+    actions.append(closeButton(`場所 ${label} を閉じる（確定）`,'armed',id,()=>void closeController.confirm(id)),
+      closeButton('やめる','cancel',id,()=>closeController.cancel(id)));
+  } else actions.append(closeButton(`場所 ${label} を閉じる`,'arm',id,()=>closeController.arm(id)));
+  return actions;
 }
 function card(value) {
   const isTask = value.kind === 'task';
@@ -88,6 +116,7 @@ function card(value) {
     button.addEventListener('click',event=>{event.stopPropagation();focus(value.workspace.id);});
     article.addEventListener('click',()=>focus(value.workspace.id));
     article.classList.add('clickable'); article.append(button);
+    if (isTask && value.canClose) article.append(closeActions(value.workspace.id, value.workspace.number ?? value.workspace.id));
   } else article.append(element('p','unavailable',value.workspace?.present === null ? '場所を確認できません' : '開ける場所がありません'));
   return article;
 }

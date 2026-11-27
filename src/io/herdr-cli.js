@@ -18,5 +18,9 @@ export function createHerdr({path = 'herdr', env = process.env, timeoutMs = 2000
       if (typeof id !== 'string' || !VALID_WORKSPACE.test(id)) throw new Error('workspace ID が不正です');
       return run(['workspace', 'focus', id]);
     },
+    close(id) {
+      if (typeof id !== 'string' || !VALID_WORKSPACE.test(id)) throw new Error('workspace ID が不正です');
+      return run(['workspace', 'close', id]);
+    },
   };
 }

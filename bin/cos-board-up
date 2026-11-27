@@ -52,7 +52,12 @@ pid=$!
 echo "$pid" > "$pidfile"
 
 for _ in $(seq 50); do
-  if alive; then echo "ボードを起動しました: ${url}（pid ${pid}、ログ ${log}）"; exit 0; fi
+  if alive; then
+    # volta のシム経由だと、ポートを持つのは子の node。止めるときに要るのはそちらの pid
+    listener="$(lsof -nP -t -iTCP:"$port" -sTCP:LISTEN 2>/dev/null | head -n 1)"
+    [ -n "$listener" ] && pid="$listener" && echo "$pid" > "$pidfile"
+    echo "ボードを起動しました: ${url}（pid ${pid}、ログ ${log}）"; exit 0
+  fi
   ps -p "$pid" > /dev/null 2>&1 || break
   sleep 0.1
 done

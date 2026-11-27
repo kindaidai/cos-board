@@ -58,7 +58,7 @@ export async function readSources({cosRoot, herdr}) {
 export async function readAssets() {
   const root = fileURLToPath(new URL('../../public/', import.meta.url));
   const assets = {};
-  for (const [path, name, type] of [['/', 'index.html','text/html'], ['/board.js','board.js','text/javascript'], ['/poller.js','poller.js','text/javascript'], ['/focus.js','focus.js','text/javascript'], ['/board.css','board.css','text/css']]) {
+  for (const [path, name, type] of [['/', 'index.html','text/html'], ['/board.js','board.js','text/javascript'], ['/poller.js','poller.js','text/javascript'], ['/focus.js','focus.js','text/javascript'], ['/close.js','close.js','text/javascript'], ['/board.css','board.css','text/css']]) {
     const source = await readSafe(root, [], name);
     if (source.kind !== 'text') throw new Error(`画面を読めません: ${name}`);
     assets[path] = {body:source.text, type:`${type}; charset=utf-8`};

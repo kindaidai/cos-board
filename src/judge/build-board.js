@@ -49,7 +49,9 @@ export function buildBoard(sources, now) {
       latestReport: reports.value.findLast(r => r.state !== REPORT.NOTE) ?? null, latestNote: reports.value.findLast(r => r.state === REPORT.NOTE) ?? null,
       ...updatedAt(row.ledgerUpdatedRaw, reports.value, now), ledgerUpdatedRaw: row.ledgerUpdatedRaw,
       workspace: row.workspace ? {id: row.workspace, number: workspace?.number ?? null, present: herdr.ok ? Boolean(workspace) : null} : null,
-      canFocus: decision.canFocus, panes: herdr.ok ? panesFor(row.workspace, state.value?.lead) : []};
+      canFocus: decision.canFocus,
+      // 閉じてよいのは、台帳で完了し、記録どおりの workspace が残っているタスクだけ
+      canClose: row.ledgerStateRaw === STATE.DONE && decision.canFocus, panes: herdr.ok ? panesFor(row.workspace, state.value?.lead) : []};
     if (decision.column === COLUMN.DRAFTS) board.drafts.push(card);
     else board.columns.find(c => c.key === decision.column).cards.push(card);
   }

@@ -113,3 +113,36 @@ test('ボードの1秒キャッシュ中でもSKILLの変更・復旧を確認�
   assert.equal(calls, 1);
   assert.deepEqual(base.alerts, []);
 });
+async function markDone(f, id) {
+  const path = join(f.root, 'ledger.md');
+  const text = await readFile(path, 'utf8');
+  await writeFile(path, text.replace(new RegExp(`(\\| ${id} \\|[^|]*\\|[^|]*\\|) [^|]+ \\|`), '$1 完了 |'));
+}
+const postClose = (f, body, headers = {}) => fetch(`${f.url}/api/close`,{method:'POST',headers:{'Content-Type':'application/json',...headers},body});
+test('台帳で完了したタスクのカードにだけ canClose が付く', async t => {
+  const f = await setup(t);
+  await markDone(f, 'DEMO-101');
+  const board = await (await fetch(`${f.url}/api/board`)).json();
+  assert.deepEqual(validateBoard(board), []);
+  const cards = [...board.drafts, ...board.columns.flatMap(c => c.cards)];
+  assert.deepEqual(cards.filter(c => c.canClose).map(c => c.id), ['DEMO-101']);
+  assert.ok(board.columns.find(c => c.key === 'done').cards.some(c => c.id === 'DEMO-101'));
+  assert.ok(cards.filter(c => c.kind === 'session').every(c => !c.canClose));
+});
+test('closeは入力を検査し、台帳で完了したタスクのworkspaceだけを閉じる', async t => {
+  const f = await setup(t);
+  await markDone(f, 'DEMO-101');
+  assert.equal((await postClose(f, '{"workspaceId":"w1AV"}', {Origin:'https://evil.example'})).status, 403);
+  assert.equal((await postClose(f, '{"workspaceId":"--help"}')).status, 400);
+  // 作業中のタスク・台帳に無いCoSのworkspace・存在しないworkspaceは閉じない
+  for (const id of ['w1BB', 'w1BA', 'w999']) assert.equal((await postClose(f, JSON.stringify({workspaceId:id}))).status, 409);
+  assert.ok(!(await readCalls(f.calls)).some(args => args[1] === 'close'));
+  const response = await postClose(f, '{"workspaceId":"w1AV"}', {Origin:f.url});
+  assert.equal(response.status, 204);
+  assert.deepEqual((await readCalls(f.calls)).at(-1), ['workspace','close','w1AV']);
+});
+test('closeの実行失敗は502', async t => {
+  const f = await setup(t, {FAKE_HERDR_CLOSE_FAIL:'1'});
+  await markDone(f, 'DEMO-101');
+  assert.equal((await postClose(f, '{"workspaceId":"w1AV"}')).status, 502);
+});
