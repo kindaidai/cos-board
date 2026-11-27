@@ -13,6 +13,7 @@ export function parseTaskState(text) {
   const table = readTable(text, '依頼', ['番号', '送達']);
   errors.push(...table.errors.map(e => ({...e, scope: 'requests'})));
   const requests = [];
+  const summaryHeader = table.headers?.find(h => h.startsWith('中身'));
   const seen = new Set();
   for (const {fields, line} of table.rows) {
     const number = Number(fields['番号']);
@@ -20,7 +21,7 @@ export function parseTaskState(text) {
       errors.push({scope: 'requests', line, message: '依頼番号か送達を解釈できません'}); continue;
     }
     seen.add(number);
-    requests.push({number, delivery: fields['送達']});
+    requests.push({number, summary: summaryHeader ? fields[summaryHeader] : '', delivery: fields['送達']});
   }
   return {value: {phase: /^- 段階:\s*(.+)$/m.exec(text)?.[1]?.trim() ?? '', workspace: workspace ?? '',
     lead: leadMatch ? {name: leadMatch[1], pane, agent: leadMatch[3] ?? 'claude'} : null, requests,

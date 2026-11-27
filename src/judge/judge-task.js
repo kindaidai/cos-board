@@ -1,4 +1,4 @@
-import { STATE, STATE_COLUMN, STATUS, REPORT, DELIVERY, PHASE, COLUMN } from '../contract.js';
+import { CLEANUP_REQUEST_PREFIX, STATE, STATE_COLUMN, STATUS, REPORT, DELIVERY, PHASE, COLUMN } from '../contract.js';
 
 function decision(row, rule, reason, {state, basis = 'ledger', needsCheck = null, badges = [], column} = {}) {
   const ledgerState = Object.values(STATE).includes(row.ledgerStateRaw) ? row.ledgerStateRaw : null;
@@ -21,7 +21,9 @@ export function judgePanes({row, state, reports, panes}) {
   if (report?.state === REPORT.EXTERNAL) return stay('10c', '現在の依頼の報告が need-external', {state: STATE.EXTERNAL, basis: 'report'});
   if (report?.state === REPORT.DONE) {
     if (state.requests.some(r => [DELIVERY.UNSENT, DELIVERY.SENDING].includes(r.delivery))) return stay('10e', '完了報告はあるが未送信の依頼がある', {badges: ['未送信の依頼あり']});
-    return stay('10d', '現在の依頼が完了し、未送信の依頼もない', {state: STATE.DONE, basis: 'report'});
+    const cleanup = state.requests.find(r => r.number === current)?.summary?.startsWith(CLEANUP_REQUEST_PREFIX);
+    if (cleanup) return stay('10d', '閉じる前の片付けの依頼が完了し、未送信の依頼もない', {state: STATE.DONE, basis: 'report'});
+    return stay('10g', '作業の依頼が完了。CoS が閉じる前の片付けを送るまで作業中', {state: STATE.WORKING, basis: 'report'});
   }
   const reason = `全部の pane が止まっているが、${current ? `依頼 ${current} の報告が working のまま（または無い）` : '現在の依頼が無い'}`;
   return stay('10f', reason, {needsCheck: reason});

@@ -14,6 +14,7 @@ function input() {
     reports: parseReportLog('1\t2026-11-27T15:26:04+0900\t1\tdone\tw1BB:p1\t終了'),
     lead: 'fixture-session', herdr: {ok: true, agents, workspaces: parseHerdr(fixture('workspaces.json'), 'workspaces').value}};
 }
+const cleanup = d => { d.state.requests[0].summary = '閉じる前の片付け（worktree と作業ファイルを消す）'; };
 const run = data => { assert.ok(judge, 'judge-task が未実装'); return judge.judgeTask(data); };
 const cases = [
   ['0', 'Herdr失敗は台帳を保つ', d => {d.herdr.ok = false;}, '作業中'],
@@ -29,7 +30,8 @@ const cases = [
   ['10a', '依頼表が不明なら保留', d => {d.state.requestsTrusted = false;}, '作業中'],
   ['10b', 'need-userはあなた待ち', d => {d.reports.value[0].state = 'need-user';}, 'あなた待ち'],
   ['10c', 'need-externalは外部待ち', d => {d.reports.value[0].state = 'need-external';}, '外部待ち'],
-  ['10d', 'doneかつ未送信なしで完了', () => {}, '完了'],
+  ['10d', '片付けの依頼のdoneで未送信なしなら完了', cleanup, '完了'],
+  ['10g', '作業の依頼のdoneは作業中のまま', () => {}, '作業中'],
   ['10e', 'doneでも未送信ありなら保留', d => {d.state.requests.push({number: 2, delivery: '未送信'});}, '作業中'],
   ['10f', 'workingの報告なら保留', d => {d.reports.value[0].state = 'working';}, '作業中'],
 ];
@@ -38,7 +40,7 @@ for (const [rule, label, edit, state] of cases) test(`判定 ${rule}: ${label}`,
   assert.equal(result.rule, rule); assert.equal(result.state, state);
 });
 test('判定10: idle/doneだけの集合で報告判定へ進む', () => {
-  const d = input(); d.herdr.agents.push({...d.herdr.agents[0], name: '隣', pane_id: 'w1BB:p2', agent_status: 'done'});
+  const d = input(); cleanup(d); d.herdr.agents.push({...d.herdr.agents[0], name: '隣', pane_id: 'w1BB:p2', agent_status: 'done'});
   assert.equal(run(d).rule, '10d');
 });
 test('unknownはblockedより優先し、blockedはworkingより優先する', () => {
@@ -109,7 +111,7 @@ test('lead空でagent_sessionありなら迷子にせず要確認にする', () 
 });
 test('agent_sessionがnull・空文字なら省略と同じく主担当として認める', () => {
   for (const session of [null, '']) {
-    const d = input(); d.herdr.agents[0].agent_session = session;
+    const d = input(); cleanup(d); d.herdr.agents[0].agent_session = session;
     assert.equal(run(d).rule, '10d');
   }
 });
@@ -126,4 +128,23 @@ test('判定4の中止予定は完了列で中止の印を付ける', () => {
   assert.deepEqual(r.badges, ['片付け待ち', '中止']);
   d.state.phase = '稼働'; d.row.ledgerStateRaw = '完了';
   assert.deepEqual(run(d).badges, ['片付け待ち']);
+});
+test('作業の依頼のdoneは作業中列で、報告を根拠にし、要確認にしない', () => {
+  const d = input(); d.row.ledgerStateRaw = '外部待ち';
+  const r = run(d);
+  assert.equal(r.rule, '10g'); assert.equal(r.state, '作業中'); assert.equal(r.column, 'working');
+  assert.equal(r.basis, 'report'); assert.equal(r.needsCheck, null);
+});
+test('片付けの判定は現在の依頼の中身で見る（前の依頼が片付けでも採らない）', () => {
+  const d = input(); cleanup(d);
+  d.state.requests.push({number: 2, summary: '追加の修正', delivery: '受領済み'});
+  d.reports = parseReportLog('1\t2026-11-27T15:26:04+0900\t1\tdone\tw1BB:p1\t片付け済み\n2\t2026-11-27T16:00:00+0900\t2\tdone\tw1BB:p1\t修正済み');
+  assert.equal(run(d).rule, '10g');
+  d.state.requests.push({number: 3, summary: '閉じる前の片付け', delivery: '送信済み'});
+  d.reports = parseReportLog('1\t2026-11-27T16:10:00+0900\t3\tdone\tw1BB:p1\t片付けた');
+  assert.equal(run(d).rule, '10d');
+});
+test('片付けの語が先頭に無ければ片付けの依頼と見なさない', () => {
+  const d = input(); d.state.requests[0].summary = '依頼の後に閉じる前の片付け';
+  assert.equal(run(d).rule, '10g');
 });

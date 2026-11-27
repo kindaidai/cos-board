@@ -9,9 +9,10 @@ export const COLUMNS = Object.freeze([
   [COLUMN.DONE, STATE.DONE], [COLUMN.LOST, STATE.LOST], [COLUMN.UNLISTED, '台帳に無いセッション'],
 ].map(Object.freeze));
 export const STATE_COLUMN = Object.freeze({ [STATE.DRAFT]: COLUMN.DRAFTS, [STATE.WORKING]: COLUMN.WORKING, [STATE.USER]: COLUMN.USER, [STATE.EXTERNAL]: COLUMN.EXTERNAL, [STATE.DONE]: COLUMN.DONE, [STATE.LOST]: COLUMN.LOST });
+export const CLEANUP_REQUEST_PREFIX = '閉じる前の片付け';
 export const VALID_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,22}$/;
 export const VALID_WORKSPACE = /^[A-Za-z0-9]+$/;
-export const SYNC_SECTION_SHA256 = 'b47caee5e25ca794d39bf19a481c75dfd64ad6fddbff3779b0ecfe88df929113';
+export const SYNC_SECTION_SHA256 = '74bdcf49b79ba30181209f6c4049a16e7afca20dde81c82eeed05bc40b8658ec';
 export const SKILL_WARNING = 'CoS の判定表の更新、または読み取り失敗を検出しました。cos-board の判定を見直してください';
 
 /** @typedef {'下書き'|'作業中'|'あなた待ち'|'外部待ち'|'完了'|'迷子'} LedgerState */

@@ -74,3 +74,12 @@ test('見出し直後の区切り行が欠けるか列数が違えば表を信�
     assert.ok(r.errors.length);
   }
 });
+test('依頼の表の中身を読み、中身の列が無ければ空にする', () => {
+  const text = fixture('state.md');
+  const parseTaskState = t => call('task-state', 'parseTaskState', t);
+  assert.equal(parseTaskState(text).value.requests[0].summary, 'CoS の Kanban 風ボード（読み取り専用の Web 画面）を作る');
+  const cleanup = parseTaskState(text + '| 2 | 閉じる前の片付け（worktree を消す） | 未送信 | |\n').value;
+  assert.equal(cleanup.requests[1].summary, '閉じる前の片付け（worktree を消す）');
+  const noSummary = parseTaskState(text.replace('| 番号 | 中身（1 行） | 送達 | 送った時刻 |', '| 番号 | 説明 | 送達 | 送った時刻 |')).value;
+  assert.equal(noSummary.requestsTrusted, true); assert.equal(noSummary.requests[0].summary, '');
+});
