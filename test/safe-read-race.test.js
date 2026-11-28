@@ -34,3 +34,18 @@ for (const timing of ['directory', 'file']) {
     assert.ok(result.reason);
   });
 }
+
+test('列挙直後にaskディレクトリを差し替えても名前を返さない',async t=>{
+  const {listSafe}=await import('../src/io/read-sources.js');
+  assert.equal(typeof listSafe,'function');
+  const f=await fixtureDirectory(t), dir=join(f.root,'tasks/DEMO-101/ask');
+  await fs.mkdir(dir); await fs.writeFile(join(dir,'1.md'),'inside');
+  const original=fs.readdir;
+  t.mock.method(fs,'readdir',async(...args)=>{
+    const result=await original(...args);
+    if(args[0]===dir) {await fs.rename(dir,dir+'-old'); await fs.mkdir(dir);}
+    return result;
+  });
+  syncBuiltinESMExports(); t.after(()=>{t.mock.restoreAll();syncBuiltinESMExports();});
+  assert.equal((await listSafe(f.root,['tasks','DEMO-101','ask'])).kind,'error');
+});

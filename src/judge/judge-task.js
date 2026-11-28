@@ -29,7 +29,7 @@ export function judgePanes({row, state, reports, panes}) {
   return stay('10f', reason, {needsCheck: reason});
 }
 
-export function judgeTask({row, state, reports, lead, herdr}) {
+export function judgeTask({row, state, reports, lead, herdr, pendingAsks = []}) {
   const stay = (rule, reason, options) => decision(row, rule, reason, options);
   const aligned = Boolean(state?.structureTrusted && row.workspace === state.workspace);
   const present = herdr.ok && herdr.workspaces.some(w => w.workspace_id === row.workspace);
@@ -51,5 +51,9 @@ export function judgeTask({row, state, reports, lead, herdr}) {
     else result = judgePanes({row, state, reports, panes: herdr.agents.filter(a => a.workspace_id === row.workspace)});
   }
   if (reports.errors.length) result.badges.push('報告に読めない行あり');
+  if ([COLUMN.WORKING,COLUMN.EXTERNAL].includes(result.column) && pendingAsks.length) {
+    result={...result,state:STATE.USER,column:COLUMN.USER,basis:'ask',rule:'11',
+      reason:`未回答の問いがある（${pendingAsks.map(a=>'ask/'+a.number).join('、')}）。もとの判定: 規則 ${result.rule}（${result.reason}）`};
+  }
   return {...result, canFocus};
 }

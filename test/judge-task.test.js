@@ -148,3 +148,13 @@ test('片付けの語が先頭に無ければ片付けの依頼と見なさな�
   const d = input(); d.state.requests[0].summary = '依頼の後に閉じる前の片付け';
   assert.equal(run(d).rule, '10g');
 });
+
+for (const [rule,label,edit] of cases) test('規則11を既存判定 '+rule+' のあとに当てる',()=>{
+  const d=input(); edit(d); const before=run(d);
+  const after=run({...d,pendingAsks:[{number:2}]});
+  if (['working','external'].includes(before.column)) {
+    assert.equal(after.rule,'11'); assert.equal(after.state,'あなた待ち');
+    assert.equal(after.basis,'ask'); assert.equal(after.needsCheck,before.needsCheck);
+    assert.deepEqual(after.badges,before.badges); assert.match(after.reason,new RegExp('規則 '+rule));
+  } else assert.deepEqual(after,before);
+});

@@ -1,0 +1,31 @@
+{
+  "result": {
+    "workspaces": [
+      {
+        "workspace_id": "wT1",
+        "number": 1,
+        "label": "出力の相談"
+      },
+      {
+        "workspace_id": "wT2",
+        "number": 2,
+        "label": "変更の取り込み"
+      },
+      {
+        "workspace_id": "wT3",
+        "number": 3,
+        "label": "作業場所の整理"
+      },
+      {
+        "workspace_id": "wCOS",
+        "number": 4,
+        "label": "CoS"
+      },
+      {
+        "workspace_id": "wSolo",
+        "number": 5,
+        "label": "独立した相談"
+      }
+    ]
+  }
+}

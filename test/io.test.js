@@ -80,3 +80,66 @@ test('readAssetsはpane-viewをJavaScriptとして配信する', async () => {
   const module = await import(`data:text/javascript;base64,${Buffer.from(assets['/pane-view.js'].body).toString('base64')}`);
   assert.equal(module.paneView({paneId:'w1AV:p2',name:null,repo:'',role:'other',status:'idle',title:'',cwd:''}).heading,'w1AV:p2');
 });
+
+test('readSafeは上限を超えずmtimeを返し、listSafeは名前を列挙する',async t=>{
+  const f=await setup(t);
+  const result=await io.readSafe(f.root,[],'ledger.md',{maxBytes:1});
+  assert.equal(result.kind,'error'); assert.match(result.reason,/大きすぎ/);
+  const good=await io.readSafe(f.root,[],'ledger.md',{maxBytes:65536});
+  assert.equal(good.mtime,(await stat(join(f.root,'ledger.md'))).mtime.toISOString());
+  assert.deepEqual((await io.listSafe(f.root,[])).names.sort(),['cos.state','ledger.md','tasks']);
+});
+test('問いは名前と番号で絞り新しい30件、異常ファイルも結果に残す',async t=>{
+  const {mkdir,writeFile}=await import('node:fs/promises');
+  const f=await setup(t), dir=join(f.root,'tasks/DEMO-101/ask');
+  await mkdir(dir);
+  for(let i=1;i<=32;i++) await writeFile(join(dir,i+'.md'),'# ask/'+i+' 題');
+  await writeFile(join(dir,'no.md'),'無視');
+  await rm(join(dir,'31.md')); await symlink(join(f.root,'ledger.md'),join(dir,'31.md'));
+  await rm(join(dir,'30.md')); execFileSync('mkfifo',[join(dir,'30.md')]);
+  const before=await stat(join(dir,'32.md'));
+  const s=await io.readSources({cosRoot:f.root,herdr:f.herdr});
+  const asks=s.tasks['DEMO-101'].asks;
+  assert.equal(asks.omitted,2); assert.equal(asks.files.length,30);
+  assert.deepEqual(asks.files.slice(0,3).map(f=>[f.name,f.source.kind]),[['32.md','text'],['31.md','error'],['30.md','error']]);
+  assert.equal((await stat(join(dir,'32.md'))).mtimeMs,before.mtimeMs);
+  await rm(dir,{recursive:true}); await symlink(f.directory,dir);
+  assert.equal((await io.readSources({cosRoot:f.root,herdr:f.herdr})).tasks['DEMO-101'].asks.kind,'error');
+});
+test('agent readはblockedだけ8件まで、危険なIDは渡さない',async t=>{
+  const f=await setup(t);
+  const agents=Array.from({length:11},(_,i)=>({workspace_id:'w1',pane_id:i===0?'__proto__':'w1:p'+i,agent:'claude',agent_status:i===10?'working':'blocked'}));
+  const herdr=cli.createHerdr({path:fakeHerdr,env:{...f.env,FAKE_HERDR_AGENTS:JSON.stringify({result:{agents}})}});
+  const s=await io.readSources({cosRoot:f.root,herdr});
+  const reads=(await readCalls(f.calls)).filter(a=>a[1]==='read');
+  assert.equal(reads.length,8);
+  assert.ok(reads.every(a=>a[2]!=='__proto__' && a[2]!=='w1:p10'));
+  assert.equal(s.prompts.__proto__.ok,false); assert.equal(s.prompts['w1:p9'].ok,false);
+  assert.equal(s.prompts['w1:p1'].ok,true);
+});
+test('readは引数を検査し、textを取得し失敗・時間切れも返す',async t=>{
+  const f=await setup(t); assert.equal(typeof f.herdr.read,'function');
+  for(const id of ['bad','w1:p1\n',null]) assert.throws(()=>f.herdr.read(id,{lines:40}));
+  for(const lines of [0,201,1.2,'40']) assert.throws(()=>f.herdr.read('w1:p1',{lines}));
+  assert.equal((await f.herdr.read('w1:p1',{lines:40})).ok,true);
+  assert.deepEqual(await readCalls(f.calls),[['agent','read','w1:p1','--source','visible','--lines','40','--format','text']]);
+  assert.match((await cli.createHerdr({path:fakeHerdr,env:{...f.env,FAKE_HERDR_READ_FAIL:'1'}}).read('w1:p1',{lines:40})).reason,/agent_not_found/);
+  assert.match((await cli.createHerdr({path:fakeHerdr,env:{...f.env,FAKE_HERDR_DELAY:'500'},timeoutMs:30}).read('w1:p1',{lines:40})).reason,/タイムアウト/);
+});
+test('readAssetsはturn-viewを独立したJavaScriptとして配信する',async()=>{
+  const assets=await io.readAssets();
+  assert.ok(assets['/turn-view.js']); assert.equal(assets['/turn-view.js'].type,'text/javascript; charset=utf-8');
+  const mod=await import('data:text/javascript;base64,'+Buffer.from(assets['/turn-view.js'].body).toString('base64'));
+  assert.equal(mod.waited(null,0),'時刻不明');
+});
+test('turns専用fixtureは4種別を揃え元ファイルを変更しない',async()=>{
+  const {fileURLToPath}=await import('node:url');
+  const root=fileURLToPath(new URL('./fixtures/cos-turns',import.meta.url));
+  const before=await snapshot(root);
+  const herdr=cli.createHerdr({path:fakeHerdr,env:{...process.env,FAKE_HERDR_SET:'turns'}});
+  const board=buildBoard(await io.readSources({cosRoot:root,herdr}),new Date('2026-11-28T00:00:00Z'));
+  assert.deepEqual([...new Set(board.turns.map(t=>t.kind))].sort(),['ask','manual','merge','permission']);
+  assert.equal(board.cos?.paneId,'wCOS:p1');
+  assert.deepEqual(board.alerts,[]);
+  assert.deepEqual(await snapshot(root),before);
+});

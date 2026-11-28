@@ -17,10 +17,18 @@
     <div id="offline" class="alert error" role="status" hidden></div>
     <div id="focus-status" class="focus-status" role="status" aria-live="polite"></div>
     <div id="alerts" aria-live="polite"></div>
+    <section id="turns" aria-label="あなたの番"></section>
     <section id="drafts" aria-label="下書き" hidden></section>
     <div id="board" class="board" aria-label="タスクの状況"></div>
     <noscript><p class="alert error">このボードを表示するには JavaScript が必要です。</p></noscript>
   </main>
+  <dialog id="detail" aria-labelledby="detail-title">
+    <form method="dialog"><button autofocus>閉じる</button></form>
+    <h2 id="detail-title"></h2>
+    <p id="detail-subtitle"></p>
+    <p id="detail-stale" role="status"></p>
+    <pre id="detail-body"></pre>
+  </dialog>
   <footer>台帳・報告は読み取り専用 <span aria-hidden="true">·</span> カードを押すと Herdr の場所を、セッションの行を押すとその pane を開きます <span aria-hidden="true">·</span> 時刻は日本時間</footer>
 </body>
 </html>

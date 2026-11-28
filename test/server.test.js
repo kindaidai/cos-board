@@ -1,3 +1,4 @@
+import { createBlockedWatch } from '../src/io/blocked-watch.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { request } from 'node:http';
@@ -14,8 +15,9 @@ const app = await import('../src/server/app.js').catch(() => null);
 async function setup(t, env = {}) {
   assert.ok(app, 'server/app が未実装');
   const f = await fixtureDirectory(t);
+  const blockedWatch = createBlockedWatch();
   const herdr = createHerdr({path:fakeHerdr,env:{...f.env,...env}});
-  const server = app.createApp({herdr,readBoard:async () => buildBoard(await readSources({cosRoot:f.root,herdr}),new Date('2026-11-27T07:00:00Z')),
+  const server = app.createApp({herdr,readBoard:async () => buildBoard(await readSources({cosRoot:f.root,herdr,blockedWatch}),new Date('2026-11-27T07:00:00Z')),
     assets:{'/':{body:'<!doctype html>',type:'text/html'}}});
   server.listen(0,'127.0.0.1'); await once(server,'listening');
   t.after(() => new Promise(resolve => server.close(resolve)));
@@ -236,4 +238,16 @@ test('アプリを前面に出せなくても Herdr では移れているので 
   const f = await activatingApp(t, {activate:() => ({ok:false, reason:'open: not found'})});
   assert.equal((await postFocus(f, {workspaceId:'w1BB'})).status, 204);
   assert.match(String(logged.mock.calls[0].arguments.join(' ')), /not found/);
+});
+
+test('blockedの読み取りを1秒キャッシュで共有し、turnsを返す',async t=>{
+  const agents={result:{agents:[{workspace_id:'w1AV',pane_id:'w1AV:p1',name:'DEMO-101',agent:'claude',agent_status:'blocked',state_change_seq:1}]}};
+  const f=await setup(t,{FAKE_HERDR_AGENTS:JSON.stringify(agents)});
+  const responses=await Promise.all([fetch(f.url+'/api/board'),fetch(f.url+'/api/board')]);
+  const b=await responses[0].json();
+  assert.deepEqual(validateBoard(b),[]);
+  assert.equal(b.turns.filter(t=>t.kind==='permission').length,1);
+  assert.ok(b.turns.find(t=>t.kind==='permission').since);
+  await fetch(f.url+'/api/board');
+  assert.equal((await readCalls(f.calls)).filter(a=>a[1]==='read').length,1);
 });

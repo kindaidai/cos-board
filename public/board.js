@@ -1,3 +1,4 @@
+import { turnView, waited, detailContent } from './turn-view.js';
 import { createPoller } from './poller.js';
 import { createFocusController, focusKey } from './focus.js';
 import { createCloseController } from './close.js';
@@ -72,6 +73,43 @@ function closeActions(id, label) {
   } else actions.append(closeButton(`場所 ${label} を閉じる`,'arm',id,()=>closeController.arm(id)));
   return actions;
 }
+let detailKey=null;
+function openDetail(turn) {
+  const content=detailContent(state.data,turn);
+  document.getElementById('detail-title').textContent=content.title;
+  document.getElementById('detail-subtitle').textContent=content.subtitle;
+  document.getElementById('detail-body').textContent=content.body;
+  document.getElementById('detail-stale').textContent='';
+  detailKey=turn.key;
+  document.getElementById('detail').showModal();
+}
+function detailButton(turn,label,scope='list') {
+  return closeButton(label,'turn-detail',scope+':'+turn.key,()=>openDetail(turn));
+}
+function turnRow(turn) {
+  const view=turnView(turn,Date.now());
+  const row=element('div','turn-row');
+  const description=element('div','turn-description');
+  description.append(element('strong','turn-kind',view.kindLabel),element('p','turn-summary',turn.summary),
+    element('p','turn-meta',turn.title+(turn.taskId ? ' · '+turn.taskId : '')+' · '+view.location),
+    element('p','turn-meta',view.since+' · '+view.waited));
+  const actions=element('div','turn-actions');
+  if (view.detailLabel) actions.append(detailButton(turn,view.detailLabel));
+  if (view.focusTarget) actions.append(closeButton('場所 '+(turn.workspace.number ?? turn.workspace.id)+' ↗','turn-focus',turn.key,()=>focus(view.focusTarget)));
+  row.append(description,actions);
+  return row;
+}
+function renderTurns(data,connected) {
+  const section=document.getElementById('turns');
+  const heading=element('div','turn-heading');
+  heading.append(element('h2','',`あなたの番 ${data.turns.length} 件`),element('p','','答えるのは CoS の画面です'));
+  if (data.cos) heading.append(closeButton(`CoS（場所 ${data.cos.number ?? data.cos.workspaceId}）を開く ↗`,'cos-focus',data.cos.paneId,()=>focus({workspaceId:data.cos.workspaceId,paneId:data.cos.paneId})));
+  section.replaceChildren(heading,...(data.turns.length ? data.turns.map(turnRow) : [element('p','empty','いま、あなたの番はありません')]));
+  section.classList.toggle('stale',connected===false);
+  if (document.getElementById('detail').open) {
+    document.getElementById('detail-stale').textContent=data.turns.some(t=>t.key===detailKey) ? '' : 'この項目はもう待ちではありません';
+  }
+}
 function card(value) {
   const isTask = value.kind === 'task';
   const article = element('article',`card ${value.needsCheck ? 'needs-check' : ''}`);
@@ -89,6 +127,20 @@ function card(value) {
   }
   article.append(badges);
   if (isTask) {
+    for (const ask of value.asks.filter(a=>!a.answered)) {
+      const box=element('div','ask-box');
+      const turn=state.data.turns.find(t=>t.key===`ask:${value.id}:${ask.file}`);
+      box.append(element('strong','',`ask/${ask.number} ${ask.title}`),element('p','',ask.question || ask.error),
+        element('p','turn-meta',ask.since ? dateTime.format(new Date(ask.since))+' · '+waited(ask.since,Date.now()) : '時刻不明'));
+      if (turn) {
+        box.append(detailButton(turn,'全文','card'));
+        box.addEventListener('click',event=>{event.stopPropagation();openDetail(turn);});
+      }
+      article.append(box);
+    }
+    const answered=value.asks.filter(a=>a.answered);
+    if (answered.length) article.append(element('p','turn-meta','答え済み: '+answered.map(a=>'ask/'+a.number).join('、')));
+    if (value.askError) article.append(element('p','check',value.askError));
     if (value.needsCheck) article.append(element('p','check',`要確認: ${value.needsCheck}`));
     detail(article,'この列の理由',value.reason);
     detail(article,'リポジトリ',value.repos.join(', '));
@@ -116,6 +168,13 @@ function card(value) {
       row.addEventListener('click',event=>{event.stopPropagation();focus(target);});
     }
     line.append(row);
+    if (pane.status==='blocked') {
+      const prompt=pane.prompt;
+      line.append(element('p','prompt-question',prompt?.ok ? prompt.question || '許可や入力を待っています' : '画面を読めません（'+(prompt?.reason ?? '未読')+'）'));
+      if (prompt?.ok) for (const option of prompt.options) line.append(element('p','prompt-option',option));
+      const turn=state.data.turns.find(t=>t.key==='pane:'+pane.paneId);
+      if (turn) line.append(detailButton(turn,'画面','card'));
+    }
     panes.append(line);
   }
   article.append(panes);
@@ -156,7 +215,8 @@ function render({data,fetchedAt,connected}) {
     else if (!column.cards.length) section.append(element('p','empty','なし'));
     section.append(...column.cards.map(card)); return section;
   }));
-  document.title = `(${data.columns[0].cards.length}) CoS ボード`;
+  renderTurns(data,connected);
+  document.title = `(${data.turns.length}) CoS ボード`;
   if (focusedId) [...document.querySelectorAll('[data-focus-id]')].find(n=>n.dataset.focusId === focusedId)?.focus({preventScroll:true});
 }
 const poller = createPoller({

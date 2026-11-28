@@ -1,6 +1,6 @@
 import { validParts } from '../parse/date.js';
 
-export function updatedAt(raw, reports, now) {
+export function ledgerTime(raw, now) {
   const match = /^(\d{2})-(\d{2}) (\d{2}):(\d{2})$/.exec(raw);
   let ledger = null;
   if (match) {
@@ -11,6 +11,11 @@ export function updatedAt(raw, reports, now) {
       if (validParts(y, month, day, hour, minute) && millis < +now + 86400_000) { ledger = millis; break; }
     }
   }
+  return ledger === null ? null : new Date(ledger).toISOString();
+}
+export function updatedAt(raw, reports, now) {
+  const time = ledgerTime(raw,now);
+  const ledger = time === null ? null : Date.parse(time);
   const newestReport = reports.reduce((latest, r) => {
     const at = Date.parse(r.at);
     return Number.isFinite(at) ? Math.max(latest, at) : latest;

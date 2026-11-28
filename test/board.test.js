@@ -113,3 +113,30 @@ test('下書きでもpaneのroleとrepoを生成する', () => {
   assert.equal(task.panes.find(p => p.paneId === 'w1AV:p1').role,'lead');
   assert.equal(task.panes.find(p => p.paneId === 'w1AV:p1').repo,'backend');
 });
+
+test('briefとstateの回答印を使い、未読の問いも残し、両方読めなければ警告する',()=>{
+  const s=sources();
+  const t=s.tasks['DEMO-101'];
+  t.asks={kind:'list',omitted:2,files:[
+    {name:'1.md',source:{kind:'text',text:'# ask/1 題\n## 問い\n質問',mtime:'2026-11-27T06:00:00.000Z'}},
+    {name:'2.md',source:{kind:'error',reason:'大きすぎて読めません'}},
+    {name:'3.md',source:{kind:'text',text:'# ask/3 別の問い',mtime:'2026-11-27T06:01:00.000Z'}}]};
+  t.brief=text('## ask/1 への答え');
+  t.state.text=t.state.text.replace('CoS の Kanban 風ボード（読み取り専用の Web 画面）を作る','ask/3 への答え');
+  let b=build(s), card=demoCard(b);
+  assert.deepEqual(card.asks.map(a=>a.answered),[true,false,true]);
+  assert.equal(card.asks[0].body,null); assert.match(card.askError,/古い問い/);
+  assert.equal(b.turns.filter(t=>t.kind==='ask').length,1);
+  assert.equal(b.cos.paneId,'w1BA:p1');
+  t.brief={kind:'error',reason:'読めない'}; t.state={kind:'error',reason:'読めない'};
+  card=demoCard(build(s)); assert.ok(card.asks.every(a=>!a.answered)); assert.match(card.askError,/答え済み/);
+});
+test('blocked paneの画面と観測時刻をカードに結び付ける',()=>{
+  const s=sources(); changeAgents(s,a=>{a.find(p=>p.pane_id==='w1AV:p1').agent_status='blocked';});
+  s.prompts={'w1AV:p1':{ok:true,stdout:'実行しますか？\n1. はい\n2. いいえ'}};
+  s.blockedSince={'w1AV:p1':'2026-11-27T06:00:00.000Z'};
+  const b=build(s), pane=demoCard(b).panes.find(p=>p.paneId==='w1AV:p1');
+  assert.equal(pane.prompt.question,'実行しますか？');
+  assert.equal(pane.blockedSince,'2026-11-27T06:00:00.000Z');
+  assert.equal(b.turns.find(t=>t.kind==='permission').sinceSource,'observed');
+});

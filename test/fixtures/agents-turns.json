@@ -1,0 +1,59 @@
+{
+  "result": {
+    "agents": [
+      {
+        "workspace_id": "wT1",
+        "pane_id": "wT1:p1",
+        "name": "TURN-1",
+        "agent": "claude",
+        "agent_status": "working",
+        "agent_session": "fixture-session",
+        "cwd": "/demo/project",
+        "terminal_title_stripped": "出力の相談",
+        "state_change_seq": 1
+      },
+      {
+        "workspace_id": "wT2",
+        "pane_id": "wT2:p1",
+        "name": "TURN-2",
+        "agent": "claude",
+        "agent_status": "working",
+        "agent_session": "fixture-session",
+        "cwd": "/demo/project",
+        "terminal_title_stripped": "変更の取り込み",
+        "state_change_seq": 1
+      },
+      {
+        "workspace_id": "wT3",
+        "pane_id": "wT3:p1",
+        "name": "TURN-3",
+        "agent": "claude",
+        "agent_status": "working",
+        "agent_session": "fixture-session",
+        "cwd": "/demo/project",
+        "terminal_title_stripped": "作業場所の整理",
+        "state_change_seq": 1
+      },
+      {
+        "workspace_id": "wCOS",
+        "pane_id": "wCOS:p1",
+        "name": "cos",
+        "agent": "claude",
+        "agent_status": "idle",
+        "cwd": "/demo",
+        "terminal_title_stripped": "CoS",
+        "state_change_seq": 1
+      },
+      {
+        "workspace_id": "wSolo",
+        "pane_id": "wSolo:p1",
+        "name": "solo",
+        "agent": "claude",
+        "agent_status": "blocked",
+        "cwd": "/demo",
+        "terminal_title_stripped": "実行の確認",
+        "state_change_seq": 2
+      }
+    ]
+  }
+}
