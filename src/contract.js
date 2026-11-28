@@ -21,7 +21,7 @@ export const LIMITS = Object.freeze({askFiles:30, askBytes:65536, briefBytes:104
 /** @typedef {'ask'|'permission'|'merge'|'manual'} TurnKind */
 /** @typedef {{key:string,kind:TurnKind,taskId:string|null,title:string,summary:string,workspace:{id:string,number:number|null}|null,paneId:string|null,askFile:string|null,canFocus:boolean,direct:boolean,since:string|null,sinceSource:'file'|'report'|'ledger'|'observed'|null}} Turn */
 export const ROLE = Object.freeze({LEAD:'lead', SIBLING:'sibling', OTHER:'other'});
-export const SYNC_SECTION_SHA256 = '74bdcf49b79ba30181209f6c4049a16e7afca20dde81c82eeed05bc40b8658ec';
+export const SYNC_SECTION_SHA256 = '02644635386e4084614c86034fa2b05b43bbd1dd477e1d39243a57fdde7bae02';
 export const SKILL_WARNING = 'CoS の判定表の更新、または読み取り失敗を検出しました。cos-board の判定を見直してください';
 
 /** @typedef {'下書き'|'作業中'|'あなた待ち'|'外部待ち'|'完了'|'迷子'} LedgerState */
