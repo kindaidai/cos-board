@@ -3,20 +3,22 @@ import { ledgerTime } from './updated-at.js';
 
 export function buildTurns(cards, now) {
   const turns=new Map();
-  const add=turn=>{if (!turns.has(turn.key)) turns.set(turn.key,turn);};
+  // 見出しと同じ問いの文は、同じ行に 2 回出さない。
+  const add=turn=>{if (!turns.has(turn.key)) turns.set(turn.key,turn.question===turn.summary ? {...turn,question:''} : turn);};
   for (const card of cards) {
     const isTask=card.kind==='task';
     const base={taskId:isTask ? card.id : null,title:isTask ? card.title : card.workspace.label,
       workspace:card.workspace ? {id:card.workspace.id,number:card.workspace.number} : null,
-      paneId:null,askFile:null,canFocus:isTask ? card.canFocus : true,direct:!isTask,since:null,sinceSource:null};
+      paneId:null,askFile:null,question:'',options:[],canFocus:isTask ? card.canFocus : true,direct:!isTask,since:null,sinceSource:null};
     const asks=isTask ? card.asks ?? [] : [];
     const pending=asks.filter(a=>!a.answered);
-    for (const ask of pending) add({...base,key:'ask:'+card.id+':'+ask.file,kind:TURN.ASK,askFile:ask.file,
+    for (const ask of pending) add({...base,key:'ask:'+card.id+':'+ask.file,kind:TURN.ASK,askFile:ask.file,question:ask.question,options:ask.options,
       summary:(ask.title || ask.question).slice(0,LIMITS.summaryChars),since:ask.since,sinceSource:ask.since ? 'file' : null});
     const blocked=card.panes.filter(p=>p.status===STATUS.BLOCKED);
     for (const pane of blocked) {
       const summary=pane.prompt?.ok ? pane.prompt.question || '許可や入力を待っています' : '画面を読めません（'+(pane.prompt?.reason ?? '未読')+'）';
       add({...base,key:'pane:'+pane.paneId,kind:TURN.PERMISSION,paneId:pane.paneId,
+        question:pane.prompt?.ok ? pane.prompt.question : '',options:pane.prompt?.ok ? pane.prompt.options : [],
         summary:((card.isCos ? 'CoS が聞いています: ' : '')+summary).slice(0,LIMITS.summaryChars),
         since:pane.blockedSince,sinceSource:pane.blockedSince ? 'observed' : null});
     }

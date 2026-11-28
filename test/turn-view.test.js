@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 const mod=await import('../public/turn-view.js').catch(()=>({}));
-const turn={key:'ask:T1:1.md',kind:'ask',taskId:'T1',title:'タスク',summary:'質問',workspace:{id:'w1',number:2},paneId:null,askFile:'1.md',canFocus:true,direct:false,since:'2026-11-27T00:00:00.000Z',sinceSource:'file'};
+const turn={key:'ask:T1:1.md',kind:'ask',taskId:'T1',title:'タスク',summary:'質問',question:'',options:[],workspace:{id:'w1',number:2},paneId:null,askFile:'1.md',canFocus:true,direct:false,since:'2026-11-27T00:00:00.000Z',sinceSource:'file'};
 const now=Date.parse('2026-11-27T02:01:00Z');
 test('一覧の文言・場所・経過・ボタンを種別から組む',()=>{
   assert.equal(typeof mod.turnView,'function');
@@ -34,4 +34,13 @@ test('dialogは下書き・問い・paneを探して安全な本文を返す',()
   card.panes[0].prompt={ok:false,reason:'時間切れ'};
   assert.match(mod.detailContent(board,{...turn,kind:'permission',paneId:'w1:p1'}).body,/時間切れ/);
   assert.match(mod.detailContent(board,{...turn,askFile:'2.md'}).body,/見つかりません/);
+});
+
+test('問いの表示モデルは空欄と推奨の強調を扱い、元データを保つ',()=>{
+  assert.equal(typeof mod.questionView,'function');
+  assert.deepEqual(mod.questionView({question:'',options:[]}),{question:'',options:[]});
+  const source={question:'実行しますか？',options:['A. 進める（推奨）','B. <script>待つ</script>']};
+  assert.deepEqual(mod.questionView(source),{question:source.question,options:[
+    {text:source.options[0],recommended:true},{text:source.options[1],recommended:false}
+  ]});
 });

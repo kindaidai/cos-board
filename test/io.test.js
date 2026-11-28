@@ -139,6 +139,11 @@ test('turns専用fixtureは4種別を揃え元ファイルを変更しない',as
   const herdr=cli.createHerdr({path:fakeHerdr,env:{...process.env,FAKE_HERDR_SET:'turns'}});
   const board=buildBoard(await io.readSources({cosRoot:root,herdr}),new Date('2026-11-28T00:00:00Z'));
   assert.deepEqual([...new Set(board.turns.map(t=>t.kind))].sort(),['ask','manual','merge','permission']);
+  const ask=board.turns.find(t=>t.kind==='ask');
+  assert.equal(ask.question,'プレビューはどの作業場所に保存しますか？');
+  assert.deepEqual(ask.options,['1. 今の作業場所（推奨）: 手元で確認する','2. 別の作業場所: 分けて確認する']);
+  const permission=board.turns.find(t=>t.kind==='permission');
+  assert.equal(permission.question,''); assert.ok(permission.summary); assert.ok(permission.options.length>0);
   assert.equal(board.cos?.paneId,'wCOS:p1');
   assert.deepEqual(board.alerts,[]);
   assert.deepEqual(await snapshot(root),before);

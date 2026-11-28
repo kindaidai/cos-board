@@ -1,4 +1,4 @@
-import { turnView, waited, detailContent } from './turn-view.js';
+import { turnView, waited, detailContent, questionView } from './turn-view.js';
 import { createPoller } from './poller.js';
 import { createFocusController, focusKey } from './focus.js';
 import { createCloseController } from './close.js';
@@ -86,12 +86,22 @@ function openDetail(turn) {
 function detailButton(turn,label,scope='list') {
   return closeButton(label,'turn-detail',scope+':'+turn.key,()=>openDetail(turn));
 }
+function appendQuestion(parent, source) {
+  const view=questionView(source);
+  if (view.question) parent.append(element('p','turn-question',view.question));
+  if (view.options.length) {
+    const list=element('ul','turn-options');
+    for (const option of view.options) list.append(element('li',option.recommended ? 'recommended' : '',option.text));
+    parent.append(list);
+  }
+}
 function turnRow(turn) {
   const view=turnView(turn,Date.now());
   const row=element('div','turn-row');
   const description=element('div','turn-description');
-  description.append(element('strong','turn-kind',view.kindLabel),element('p','turn-summary',turn.summary),
-    element('p','turn-meta',turn.title+(turn.taskId ? ' · '+turn.taskId : '')+' · '+view.location),
+  description.append(element('strong','turn-kind',view.kindLabel),element('p','turn-summary',turn.summary));
+  appendQuestion(description,turn);
+  description.append(element('p','turn-meta',turn.title+(turn.taskId ? ' · '+turn.taskId : '')+' · '+view.location),
     element('p','turn-meta',view.since+' · '+view.waited));
   const actions=element('div','turn-actions');
   if (view.detailLabel) actions.append(detailButton(turn,view.detailLabel));
@@ -130,8 +140,10 @@ function card(value) {
     for (const ask of value.asks.filter(a=>!a.answered)) {
       const box=element('div','ask-box');
       const turn=state.data.turns.find(t=>t.key===`ask:${value.id}:${ask.file}`);
-      box.append(element('strong','',`ask/${ask.number} ${ask.title}`),element('p','',ask.question || ask.error),
-        element('p','turn-meta',ask.since ? dateTime.format(new Date(ask.since))+' · '+waited(ask.since,Date.now()) : '時刻不明'));
+      box.append(element('strong','',`ask/${ask.number} ${ask.title}`));
+      appendQuestion(box,ask);
+      if (!ask.question && ask.error) box.append(element('p','',ask.error));
+      box.append(element('p','turn-meta',ask.since ? dateTime.format(new Date(ask.since))+' · '+waited(ask.since,Date.now()) : '時刻不明'));
       if (turn) {
         box.append(detailButton(turn,'全文','card'));
         box.addEventListener('click',event=>{event.stopPropagation();openDetail(turn);});
@@ -171,7 +183,7 @@ function card(value) {
     if (pane.status==='blocked') {
       const prompt=pane.prompt;
       line.append(element('p','prompt-question',prompt?.ok ? prompt.question || '許可や入力を待っています' : '画面を読めません（'+(prompt?.reason ?? '未読')+'）'));
-      if (prompt?.ok) for (const option of prompt.options) line.append(element('p','prompt-option',option));
+      if (prompt?.ok) appendQuestion(line,{question:'',options:prompt.options});
       const turn=state.data.turns.find(t=>t.key==='pane:'+pane.paneId);
       if (turn) line.append(detailButton(turn,'画面','card'));
     }

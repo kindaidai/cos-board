@@ -38,12 +38,15 @@ test('paneのroleとrepoを検査し、sessionはotherだけ、重複leadは許�
 
 test('問い・確認画面・あなたの番の整合性を検査する', () => {
   const pane = {paneId:'w1:p1',name:null,role:'other',repo:'',agent:'claude',status:'blocked',cwd:'',title:'',prompt:{ok:false,reason:'未読'},blockedSince:null};
-  const ask = {file:'01.md',number:1,answered:false,title:'題',question:'問い',request:null,since:null,body:'全文',error:null};
+  const ask = {file:'01.md',number:1,answered:false,title:'題',question:'問い',options:[],request:null,since:null,body:'全文',error:null};
   const task = {kind:'task',id:'T1',title:'',area:'',type:'',repos:[],prs:[],nextAction:'',state:'作業中',ledgerState:'作業中',ledgerStateRaw:'作業中',basis:'ask',rule:'11',reason:'',needsCheck:null,badges:[],latestReport:null,latestNote:null,updatedAt:null,updatedSource:null,ledgerUpdatedRaw:'',workspace:null,canFocus:false,canClose:false,asks:[ask],askError:null,panes:[pane]};
-  const turn = {key:'ask:T1:01.md',kind:'ask',taskId:'T1',title:'題',summary:'問い',workspace:null,paneId:null,askFile:'01.md',canFocus:false,direct:false,since:null,sinceSource:null};
+  const turn = {key:'ask:T1:01.md',kind:'ask',taskId:'T1',title:'題',summary:'問い',question:'',options:[],workspace:null,paneId:null,askFile:'01.md',canFocus:false,direct:false,since:null,sinceSource:null};
   const board = {generatedAt:'2026-11-27T06:00:00.000Z',refreshSeconds:3,ledger:{ok:true,lastSync:null,limit:null,activeCount:1},herdr:{ok:true},alerts:[],drafts:[task],columns:contract.COLUMNS.map(([key,title])=>({key,title,available:true,cards:[]})),turns:[turn],cos:null};
   assert.deepEqual(contract.validateBoard(board),[]);
   for (const change of [
+    b=>{delete b.turns[0].question;}, b=>{b.turns[0].question=null;},
+    b=>{delete b.turns[0].options;}, b=>{b.turns[0].options=[1];}, b=>{b.turns[0].options='bad';},
+    b=>{delete b.drafts[0].asks[0].options;}, b=>{b.drafts[0].asks[0].options=[null];},
     b=>{delete b.turns;}, b=>{delete b.cos;}, b=>{b.turns.push({...turn});},
     b=>{b.turns[0].key='bad';}, b=>{b.turns[0].kind='permission';},
     b=>{b.turns[0].paneId='w1:p1';}, b=>{b.turns[0].kind='manual';},

@@ -12,7 +12,7 @@ export function taskAsks({asks, brief, state}) {
   if (files.length && brief?.kind !== 'text' && !state?.requestsTrusted) errors.push('答え済みを見分けられません（brief.md と state.md が読めません）');
   const values=files.map(({name,source})=>{
     const number=Number.parseInt(name);
-    const parsed=source.kind==='text' ? parseAsk(source.text) : {title:'',question:'',request:null};
+    const parsed=source.kind==='text' ? parseAsk(source.text) : {title:'',question:'',options:[],request:null};
     const done=answered.has(number);
     const malformed=source.kind==='text' && (!parsed.title || !parsed.question);
     const error=done ? null : source.kind!=='text' ? source.reason ?? '問いがありません' : malformed ? '問いの形を読めません' : null;

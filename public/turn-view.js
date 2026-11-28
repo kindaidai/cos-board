@@ -30,3 +30,7 @@ export function detailContent(board, turn) {
   return {title:ask?.title ?? '問い',subtitle:turn.taskId+' · ask/'+turn.askFile,
     body:ask?.body ?? ask?.error ?? '問いが見つかりません'};
 }
+
+export function questionView({question, options}) {
+  return {question,options:options.map(text=>({text,recommended:text.includes('推奨')}))};
+}

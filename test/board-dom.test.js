@@ -19,10 +19,12 @@ test('問い枠はdialogを開き、再描画でカードのボタンのフォ�
   const doc={hidden:false,listeners:{},activeElement:null,addEventListener(type,fn){this.listeners[type]=fn;},createElement(tag){return new Node(tag,this);},getElementById(id){return this.nodes[id];},querySelectorAll(){return Object.values(this.nodes).flatMap(descendants).filter(n=>n.dataset.focusId);}};
   doc.nodes=Object.fromEntries(ids.map(id=>[id,new Node('div',doc)]));
   const win={listeners:{},addEventListener(type,fn){this.listeners[type]=fn;},getSelection:()=>({isCollapsed:true})};
-  const ask={file:'1.md',number:1,answered:false,title:'題',question:'質問',body:'全文',error:null,since:null};
-  const turn={key:'ask:T1:1.md',kind:'ask',taskId:'T1',title:'タスク',summary:'題',workspace:{id:'w1',number:1},paneId:null,askFile:'1.md',canFocus:true,direct:false,since:null,sinceSource:null};
+  const ask={file:'1.md',number:1,answered:false,title:'題',question:'質問',options:[],body:'全文',error:null,since:null};
+  const turn={key:'ask:T1:1.md',kind:'ask',taskId:'T1',title:'タスク',summary:'題',question:'',options:[],workspace:{id:'w1',number:1},paneId:null,askFile:'1.md',canFocus:true,direct:false,since:null,sinceSource:null};
   const card={kind:'task',id:'T1',title:'タスク',area:'',type:'',workspace:{id:'w1',number:1},badges:[],asks:[ask],askError:null,state:'あなた待ち',ledgerState:'作業中',ledgerStateRaw:'作業中',repos:[],prs:[],panes:[],canFocus:true};
   const board={generatedAt:'2026-11-27T00:00:00.000Z',ledger:{ok:true,activeCount:1,limit:8},alerts:[],drafts:[],columns:[{key:'your-turn',title:'あなたの番',available:true,cards:[card]}],turns:[turn],cos:null};
+  ask.options=['A. 進める（推奨）','B. <script>待つ</script>'];
+  turn.question=ask.question; turn.options=ask.options;
   const requests=[];
   t.mock.method(globalThis,'fetch',async(url)=>{requests.push(url);return {ok:true,json:async()=>board};});
   globalThis.document=doc; globalThis.window=win;
@@ -32,6 +34,18 @@ test('問い枠はdialogを開き、再描画でカードのボタンのフォ�
   await settle();
   const article=descendants(doc.nodes.board).find(n=>n.tagName==='article');
   const box=descendants(article).find(n=>n.className==='ask-box');
+  const description=descendants(doc.nodes.turns).find(n=>n.className==='turn-description');
+  for (const parent of [description,box]) {
+    const question=descendants(parent).find(n=>n.className==='turn-question');
+    assert.equal(question?.textContent,'質問');
+    const list=descendants(parent).find(n=>n.className==='turn-options');
+    assert.equal(list?.tagName,'ul');
+    assert.deepEqual(list.children.map(n=>n.textContent),ask.options);
+    assert.equal(list.children[0].className,'recommended');
+    assert.equal(list.children[1].className,'');
+    assert.ok(!descendants(parent).some(n=>n.tagName==='script'));
+  }
+  assert.ok(description.children.indexOf(description.children.find(n=>n.className==='turn-summary'))<description.children.indexOf(description.children.find(n=>n.className==='turn-question')));
   const button=descendants(box).find(n=>n.tagName==='button');
   const detailIds=doc.querySelectorAll().map(n=>n.dataset.focusId);
   assert.equal(new Set(detailIds).size,detailIds.length,'一覧とカードでフォーカスIDを重複させない');
@@ -43,4 +57,8 @@ test('問い枠はdialogを開き、再描画でカードのボタンのフォ�
   assert.equal(doc.nodes.detail.open,true);
   assert.equal(doc.nodes['detail-body'].textContent,'全文');
   assert.ok(!requests.includes('/api/focus'),'問い枠のクリックを場所へ流さない');
+  ask.question=''; ask.options=[]; turn.question=''; turn.options=[];
+  doc.hidden=false;win.listeners.pageshow();await settle();
+  assert.ok(!descendants(doc.nodes.turns).some(n=>['turn-question','turn-options'].includes(n.className)));
+  assert.ok(!descendants(doc.nodes.board).some(n=>['turn-question','turn-options'].includes(n.className)));
 });
