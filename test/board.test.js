@@ -68,3 +68,48 @@ test('stateが参照するworkspaceも台帳外カードとして二重表示し
   const s = sources(); s.tasks['cos-board-261127-init'].state.text = s.tasks['cos-board-261127-init'].state.text.replaceAll('w1BB','w1BA');
   assert.equal(build(s).columns[5].cards.length, 0);
 });
+
+const changeAgents = (s, change) => {
+  const json = JSON.parse(s.agents.stdout); change(json.result.agents); s.agents.stdout = JSON.stringify(json);
+};
+const demoCard = b => cards(b).find(c => c.id === 'DEMO-101');
+test('paneは主担当・隣の担当・その他の順で同役割は自然順になる', () => {
+  const s = sources();
+  changeAgents(s, agents => {
+    const sibling = agents.find(a => a.pane_id === 'w1AV:p2');
+    sibling.name = 'DEMO-101-frontend';
+    agents.unshift({...sibling,pane_id:'w1AV:p10',name:'DEMO-101-worker',agent_status:'blocked'});
+    for (const [i,name] of ['DEMO-1010-x','DEMO-101-','frontend',null].entries()) agents.push({...sibling,pane_id:`w1AV:p${i+20}`,name});
+  });
+  const panes = demoCard(build(s)).panes;
+  assert.deepEqual(panes.map(p => [p.paneId,p.role]), [['w1AV:p1','lead'],['w1AV:p2','sibling'],['w1AV:p10','sibling'],['w1AV:p20','other'],['w1AV:p21','other'],['w1AV:p22','other'],['w1AV:p23','other']]);
+  assert.ok(panes.every(p => !Object.hasOwn(p,'isLead')));
+});
+test('stateを読めないと主担当にせず、sessionのpaneはすべてotherになる', () => {
+  const s = sources(); s.tasks['DEMO-101'].state = {kind:'error',reason:'読めない'};
+  assert.ok(demoCard(build(s)).panes.every(p => p.role !== 'lead'));
+  s.ledger = {kind:'missing'};
+  const sessions = cards(build(s));
+  assert.ok(sessions.every(c => c.kind === 'session'));
+  assert.ok(sessions.flatMap(c => c.panes).every(p => p.role === 'other'));
+});
+test('repoはhome置換後のcwd末尾で、空・root・末尾スラッシュを扱う', () => {
+  for (const [cwd,display,repo] of [['/Users/example/develop/backend','~/develop/backend','backend'],['/Users/example','~','~'],['','',''],['/','/',''],['/work/frontend///','/work/frontend///','frontend']]) {
+    const s = sources(); changeAgents(s, agents => {agents.find(a => a.pane_id === 'w1AV:p1').cwd = cwd;});
+    const pane = demoCard(build(s)).panes.find(p => p.paneId === 'w1AV:p1');
+    assert.equal(pane.cwd,display); assert.equal(pane.repo,repo);
+  }
+});
+test('重複した主担当行は迷子のカードにleadを2行残して表示する', () => {
+  const s = sources(); changeAgents(s, agents => agents.push({...agents.find(a => a.pane_id === 'w1AV:p1')}));
+  const b = build(s), task = demoCard(b);
+  assert.ok(b.columns.find(c => c.key === 'lost').cards.includes(task));
+  assert.equal(task.panes.filter(p => p.role === 'lead').length,2);
+  assert.deepEqual(validateBoard(b),[]);
+});
+test('下書きでもpaneのroleとrepoを生成する', () => {
+  const s = sources(); s.ledger.text = s.ledger.text.replace('| 外部待ち |','| 下書き |');
+  const task = build(s).drafts[0];
+  assert.equal(task.panes.find(p => p.paneId === 'w1AV:p1').role,'lead');
+  assert.equal(task.panes.find(p => p.paneId === 'w1AV:p1').repo,'backend');
+});

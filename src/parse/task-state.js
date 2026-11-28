@@ -1,4 +1,4 @@
-import { DELIVERY, VALID_WORKSPACE } from '../contract.js';
+import { DELIVERY, VALID_WORKSPACE, VALID_PANE } from '../contract.js';
 import { readTable } from './table.js';
 
 export function parseTaskState(text) {
@@ -9,7 +9,7 @@ export function parseTaskState(text) {
   const leadMatch = /^名前 (\S+) \/ pane (\S+)(?: \/ agent (\S+))? \/ セッションは lead\s*$/.exec(leadText ?? '');
   if (workspace === undefined || (workspace && !VALID_WORKSPACE.test(workspace))) errors.push({scope: 'structure', line: 1, message: 'workspace を解釈できません'});
   const pane = leadMatch?.[2] === '（未起動）' ? '' : leadMatch?.[2];
-  if (!leadMatch || (pane && !/^[A-Za-z0-9]+:p[A-Za-z0-9]+$/.test(pane))) errors.push({scope: 'structure', line: 1, message: '主担当を解釈できません'});
+  if (!leadMatch || (pane && !VALID_PANE.test(pane))) errors.push({scope: 'structure', line: 1, message: '主担当を解釈できません'});
   const table = readTable(text, '依頼', ['番号', '送達']);
   errors.push(...table.errors.map(e => ({...e, scope: 'requests'})));
   const requests = [];

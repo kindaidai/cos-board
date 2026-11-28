@@ -9,6 +9,11 @@ if (process.env.FAKE_HERDR_FAIL === args[0] || process.env.FAKE_HERDR_FAIL === '
 if (args[0] === 'workspace' && args[1] === 'focus' && args.length === 3) {
   if (process.env.FAKE_HERDR_FOCUS_FAIL) process.exit(1);
   console.log('{}');
+} else if (args[0] === 'agent' && args[1] === 'focus' && args.length === 3) {
+  if (process.env.FAKE_HERDR_FOCUS_FAIL) {
+    console.log(JSON.stringify({error:{code:'agent_not_found',message:`agent target ${args[2]} not found`},id:'cli:agent:focus'})); process.exit(1);
+  }
+  console.log(JSON.stringify({result:{agent:{pane_id:args[2],focused:true}},type:'agent_info'}));
 } else if (args[0] === 'workspace' && args[1] === 'close' && args.length === 3) {
   if (process.env.FAKE_HERDR_CLOSE_FAIL) process.exit(1);
   console.log('{}');

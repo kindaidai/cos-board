@@ -1,6 +1,7 @@
 import { createPoller } from './poller.js';
-import { createFocusController } from './focus.js';
+import { createFocusController, focusKey } from './focus.js';
 import { createCloseController } from './close.js';
+import { paneView } from './pane-view.js';
 
 const state = {data:null, fetchedAt:null, connected:null};
 const time = new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
@@ -29,20 +30,20 @@ function report(parent,label,value) {
   if (!value) return;
   detail(parent,`${label} · ${value.state} · 依頼 ${value.request} · ${dateTime.format(new Date(value.at))}`,value.text);
 }
-async function sendFocus(id) {
+async function sendFocus(target) {
   const feedback = document.getElementById('focus-status');
   feedback.textContent = 'Herdr の場所を開いています…';
   try {
-    const response = await fetch('/api/focus',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({workspaceId:id})});
+    const response = await fetch('/api/focus',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(target)});
     if (!response.ok) {const data = await response.json();throw new Error(data.error || `HTTP ${response.status}`);}
-    feedback.textContent = `Herdr の ${id} を開きました`;
+    feedback.textContent = `Herdr の ${focusKey(target)} を開きました`;
   } catch (error) {feedback.textContent = `場所を開けません: ${error.message}`;}
 }
-// DOMの寿命ではなくworkspace単位で保持し、定期描画で二重送信の印を失わない。
+// DOMの寿命ではなく対象単位で保持し、定期描画で二重送信の印を失わない。
 const focusController = createFocusController({sendFocus, onChange:() => render(state)});
-function focus(id) {
+function focus(target) {
   if (!window.getSelection()?.isCollapsed) return;
-  void focusController.focus(id);
+  void focusController.focus(target);
 }
 async function sendClose(id) {
   const feedback = document.getElementById('focus-status');
@@ -97,24 +98,36 @@ function card(value) {
     report(article,'最新のメモ',value.latestNote);
     article.append(element('p','updated',value.updatedAt ? `${dateTime.format(new Date(value.updatedAt))} · ${relative(value.updatedAt)} · ${value.updatedSource === 'ledger' ? '台帳' : '報告'}` : '更新時刻なし'));
   }
+  const canFocus = isTask ? value.canFocus : true;
+  const cardId = isTask ? value.id : value.workspace.id;
   const panes = element('ul','panes');
   for (const pane of value.panes) {
-    const line = element('li');
-    line.append(element('span',`pane-state ${pane.status}`,pane.status),element('span','pane-name',`${pane.name || pane.paneId}${pane.isLead ? ' · 主担当' : ''}`));
-    if (!isTask) {
-      line.append(element('span','pane-detail',pane.cwd),element('span','pane-detail',pane.title));
+    const view = paneView(pane);
+    const line = element('li',`pane${view.waiting ? ' waiting' : ''}`);
+    const row = element(canFocus ? 'button' : 'div','pane-open');
+    row.title = view.tooltip;
+    for (const [className,text] of [[`pane-state ${view.status}`,view.status],['pane-name',view.heading],['pane-role',view.roleLabel],['pane-wait',view.waitingLabel],['pane-detail',view.meta],['pane-detail pane-title',view.title]]) {
+      if (text) row.append(element('span',className,text));
     }
+    if (canFocus) {
+      const target = {workspaceId:value.workspace.id, paneId:pane.paneId};
+      row.type = 'button'; row.dataset.focusId = `pane:${value.kind}:${cardId}:${pane.paneId}`;
+      if (focusController.isPending(target)) row.setAttribute('aria-disabled','true');
+      row.addEventListener('click',event=>{event.stopPropagation();focus(target);});
+    }
+    line.append(row);
     panes.append(line);
   }
   article.append(panes);
-  const canFocus = isTask ? value.canFocus : true;
   if (canFocus) {
+    const target = {workspaceId:value.workspace.id};
     const button = element('button','open-workspace',`場所 ${value.workspace.number ?? value.workspace.id} を開く ↗`);
     button.type = 'button'; button.dataset.focusId = isTask ? value.id : value.workspace.id;
-    button.disabled = focusController.isPending(value.workspace.id);
-    if (button.disabled) button.textContent = '場所を開いています…';
-    button.addEventListener('click',event=>{event.stopPropagation();focus(value.workspace.id);});
-    article.addEventListener('click',()=>focus(value.workspace.id));
+    if (focusController.isPending(target)) {
+      button.setAttribute('aria-disabled','true'); button.textContent = '場所を開いています…';
+    }
+    button.addEventListener('click',event=>{event.stopPropagation();focus(target);});
+    article.addEventListener('click',()=>focus(target));
     article.classList.add('clickable'); article.append(button);
     if (isTask && value.canClose) article.append(closeActions(value.workspace.id, value.workspace.number ?? value.workspace.id));
   } else article.append(element('p','unavailable',value.workspace?.present === null ? '場所を確認できません' : '開ける場所がありません'));

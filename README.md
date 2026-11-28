@@ -55,10 +55,13 @@ npm start -- --port 4271 --cos-root ~/develop/.cos --herdr /path/to/herdr
 
 台帳・state.md・report.log・lead・cos.state は読み取り専用で、変更しません。symlinkや通常ファイルでない対象は開きません。
 
-Herdr への操作は次の 2 つだけで、どちらもユーザーがボタンを押したときに限ります。
+Herdr への操作は次の 3 つだけで、いずれもユーザーがカードやボタンを押したときに限ります。
 
 - **開く**（`workspace focus <id>`）: カードを押したとき。IDの形式と現在の一覧を確認してから実行します。workspaceの記録が食い違うカードは開けません
+- **pane を開く**（`agent focus <pane_id>`）: セッションの行を押したとき。pane ID の形式と、今の `agent list` でその workspace に居ることを確認してから実行します。見つからなければ開かず、workspace を開く動作にも切り替えません
 - **閉じる**（`workspace close <id>`）: 台帳の状態が「完了」で、記録どおりの workspace が残っているタスクのカードにだけボタンを出します。「閉じる」を押すと「閉じる（確定）」と「やめる」に変わり、確定を押したときだけ実行します。実行の直前に台帳と Herdr の一覧を読み直し、条件を満たさなければ閉じません（409）。台帳に無いセッションや、完了以外のカードには出しません
+
+セッションの行には名前・役割・リポジトリ・端末タイトル・状態を表示します。「主担当」は state.md の名前と pane に一致する担当、「隣の担当」は名前が `<タスク ID>-` で始まり、続きが 1 文字以上ある pane（主担当を除く）です。台帳に無いセッションには役割のラベルを付けません。リポジトリは cwd の末尾のディレクトリ名で、git は見ていません。cwd 全文は行のツールチップで読めます。行の「あなた待ち」は Herdr の `blocked` だけを指し、報告の `need-user` は含みません。報告によってカードが「あなたの番」にあっても、行に「あなた待ち」が付くとは限りません。
 
 閉じたことを CoS には知らせません。CoS が自分で workspace の消失に気付きます。ボードは CoS のディレクトリに書き込みません。
 
@@ -88,4 +91,10 @@ npm start -- --port 0 --cos-root test/fixtures/cos --herdr test/fixtures/fake-he
 
 表示されたURLの `/api/board` でJSONを確認できます。偽物のCLIは `FAKE_HERDR_FAIL=all` で失敗、`FAKE_HERDR_DELAY=2500` でタイムアウトを再現できます。
 
-手動確認: 明暗・狭い画面での横スクロール、文字選択中はfocusしないこと、非表示からの復帰、サーバー停止後の接続失敗表示と再起動後の復帰を確認してください。
+blocked の行を確認するときは次のように起動します。
+
+```sh
+FAKE_HERDR_AGENTS="$(node -e 'const j=JSON.parse(require("fs").readFileSync("test/fixtures/agents.json","utf8"));j.result.agents[3].agent_status="blocked";console.log(JSON.stringify(j))')" npm start -- --port 0 --cos-root test/fixtures/cos --herdr test/fixtures/fake-herdr.js --skill-path test/fixtures/chief-of-staff.md
+```
+
+手動確認: 明暗・狭い画面での横スクロール、文字選択中はfocusしないこと、非表示からの復帰、サーバー停止後の接続失敗表示と再起動後の復帰を確認してください。pane の行を押すとその pane を開く要求になり、blocked の行が明暗どちらでも読めることも確認します。Tab で pane の行や「場所 N を開く」に移り Enter を押して、送信中・成功後・3 秒後の再描画でもフォーカスがそのボタンに残ることを確認してください。`FAKE_HERDR_FOCUS_FAIL=1` を付けて起動したときも、失敗の表示のあとにフォーカスが残ることを確かめます。フィクスチャでは実物の pane へは移動しません。

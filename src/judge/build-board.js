@@ -1,4 +1,4 @@
-import { COLUMN, COLUMNS, STATE, STATUS, REPORT, validateBoard } from '../contract.js';
+import { COLUMN, COLUMNS, STATE, STATUS, REPORT, ROLE, validateBoard } from '../contract.js';
 import { parseLedger } from '../parse/ledger.js';
 import { parseTaskState } from '../parse/task-state.js';
 import { parseReportLog } from '../parse/report-log.js';
@@ -29,10 +29,14 @@ export function buildBoard(sources, now) {
   if (cos.errors.length) board.alerts.push({level: 'warn', message: `CoS の識別情報: ${cos.errors.map(e => e.message).join(' / ')}`});
   const byWorkspace = new Map(workspaces.value.map(w => [w.workspace_id, w]));
   const associated = new Set();
-  const panesFor = (id, lead = null) => agents.value.filter(a => a.workspace_id === id).map(a => ({paneId: a.pane_id, name: a.name,
-    isLead: a.pane_id === lead?.pane && a.name === lead?.name, agent: a.agent, status: a.agent_status,
-    cwd: sources.home && (a.cwd === sources.home || a.cwd.startsWith(`${sources.home}/`)) ? `~${a.cwd.slice(sources.home.length)}` : a.cwd,
-    title: a.terminal_title_stripped}));
+  const roleOrder = [ROLE.LEAD, ROLE.SIBLING, ROLE.OTHER];
+  const panesFor = (id, {lead = null, taskId = null} = {}) => agents.value.filter(a => a.workspace_id === id).map(a => {
+    const cwd = sources.home && (a.cwd === sources.home || a.cwd.startsWith(`${sources.home}/`)) ? `~${a.cwd.slice(sources.home.length)}` : a.cwd;
+    const role = a.pane_id === lead?.pane && a.name === lead?.name ? ROLE.LEAD :
+      taskId && a.name?.startsWith(`${taskId}-`) && a.name.length > taskId.length + 1 ? ROLE.SIBLING : ROLE.OTHER;
+    return {paneId:a.pane_id, name:a.name, role, repo:cwd.split('/').filter(Boolean).at(-1) ?? '',
+      agent:a.agent, status:a.agent_status, cwd, title:a.terminal_title_stripped};
+  }).sort((a, b) => roleOrder.indexOf(a.role) - roleOrder.indexOf(b.role) || a.paneId.localeCompare(b.paneId, 'en', {numeric:true}));
   for (const row of ledger.value?.rows ?? []) {
     const taskSources = sources.tasks?.[row.id] ?? {};
     const state = parseFile(taskSources.state, parseTaskState, 'state.md');
@@ -51,7 +55,7 @@ export function buildBoard(sources, now) {
       workspace: row.workspace ? {id: row.workspace, number: workspace?.number ?? null, present: herdr.ok ? Boolean(workspace) : null} : null,
       canFocus: decision.canFocus,
       // 閉じてよいのは、台帳で完了し、記録どおりの workspace が残っているタスクだけ
-      canClose: row.ledgerStateRaw === STATE.DONE && decision.canFocus, panes: herdr.ok ? panesFor(row.workspace, state.value?.lead) : []};
+      canClose: row.ledgerStateRaw === STATE.DONE && decision.canFocus, panes: herdr.ok ? panesFor(row.workspace, {lead:state.value?.lead, taskId:row.id}) : []};
     if (decision.column === COLUMN.DRAFTS) board.drafts.push(card);
     else board.columns.find(c => c.key === decision.column).cards.push(card);
   }

@@ -12,13 +12,17 @@ export const STATE_COLUMN = Object.freeze({ [STATE.DRAFT]: COLUMN.DRAFTS, [STATE
 export const CLEANUP_REQUEST_PREFIX = '閉じる前の片付け';
 export const VALID_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,22}$/;
 export const VALID_WORKSPACE = /^[A-Za-z0-9]+$/;
+export const VALID_PANE = /^[A-Za-z0-9]+:p[A-Za-z0-9]+$/;
+export const ROLE = Object.freeze({LEAD:'lead', SIBLING:'sibling', OTHER:'other'});
 export const SYNC_SECTION_SHA256 = '74bdcf49b79ba30181209f6c4049a16e7afca20dde81c82eeed05bc40b8658ec';
 export const SKILL_WARNING = 'CoS の判定表の更新、または読み取り失敗を検出しました。cos-board の判定を見直してください';
 
 /** @typedef {'下書き'|'作業中'|'あなた待ち'|'外部待ち'|'完了'|'迷子'} LedgerState */
 /** @typedef {'your-turn'|'working'|'external'|'done'|'lost'|'unlisted'} ColumnKey */
 /** @typedef {{seq:number, at:string, request:number, state:'working'|'need-user'|'need-external'|'done'|'note', pane:string, text:string}} Report */
-/** @typedef {{paneId:string, name:string|null, isLead:boolean, agent:string, status:'idle'|'working'|'blocked'|'done'|'unknown', cwd:string, title:string}} Pane */
+/** @typedef {'lead'|'sibling'|'other'} PaneRole */
+/** @typedef {{paneId:string, name:string|null, role:PaneRole, repo:string, agent:string, status:'idle'|'working'|'blocked'|'done'|'unknown', cwd:string, title:string}} Pane */
+/** @typedef {{workspaceId:string, paneId?:string}} FocusTarget */
 /** @typedef {{kind:'task', id:string, title:string, area:string, type:string, repos:string[], prs:string[], nextAction:string, state:LedgerState|null, ledgerState:LedgerState|null, ledgerStateRaw:string, basis:'herdr'|'report'|'ledger', rule:string, reason:string, needsCheck:string|null, badges:string[], latestReport:Report|null, latestNote:Report|null, updatedAt:string|null, updatedSource:'ledger'|'report'|null, ledgerUpdatedRaw:string, workspace:{id:string,number:number|null,present:boolean|null}|null, canFocus:boolean, canClose:boolean, panes:Pane[]}} TaskCard */
 /** @typedef {{kind:'session', workspace:{id:string,number:number,label:string}, isCos:boolean, blocked:boolean, panes:Pane[]}} SessionCard */
 /** @typedef {{key:ColumnKey,title:string,available:boolean,cards:(TaskCard|SessionCard)[]}} Column */
@@ -43,13 +47,14 @@ const object = fields => (v, p, errors) => {
 const timestamp = scalar(v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(v) &&
   Number.isFinite(Date.parse(v)) && new Date(v).toISOString() === (v.length === 20 ? v.replace('Z', '.000Z') : v), '実在する UTC の日時が必要');
 const report = object({seq: integer, at: timestamp, request: integer, state: enumeration(Object.values(REPORT)), pane: string, text: string});
-const pane = object({paneId: string, name: nullable(string), isLead: boolean, agent: string, status: enumeration(Object.values(STATUS)), cwd: string, title: string});
+const pane = object({paneId: string, name: nullable(string), role: enumeration(Object.values(ROLE)), repo: string, agent: string, status: enumeration(Object.values(STATUS)), cwd: string, title: string});
 const task = object({kind: enumeration(['task']), id: string, title: string, area: string, type: string, repos: array(string), prs: array(string), nextAction: string,
   state: nullable(enumeration(Object.values(STATE))), ledgerState: nullable(enumeration(Object.values(STATE))), ledgerStateRaw: string,
   basis: enumeration(['herdr', 'report', 'ledger']), rule: string, reason: string, needsCheck: nullable(string), badges: array(string),
   latestReport: nullable(report), latestNote: nullable(report), updatedAt: nullable(timestamp), updatedSource: nullable(enumeration(['ledger', 'report'])),
   ledgerUpdatedRaw: string, workspace: nullable(object({id: string, number: nullable(integer), present: nullable(boolean)})), canFocus: boolean, canClose: boolean, panes: array(pane)});
-const session = object({kind: enumeration(['session']), workspace: object({id: string, number: integer, label: string}), isCos: boolean, blocked: boolean, panes: array(pane)});
+const sessionPane = (v, p, errors) => { pane(v, p, errors); enumeration([ROLE.OTHER])(v?.role, `${p}.role`, errors); };
+const session = object({kind: enumeration(['session']), workspace: object({id: string, number: integer, label: string}), isCos: boolean, blocked: boolean, panes: array(sessionPane)});
 const card = (v, p, errors) => v?.kind === 'session' ? session(v, p, errors) : task(v, p, errors);
 const source = extra => (v, p, errors) => {
   if (!object({ok: boolean})(v, p, errors)) return;

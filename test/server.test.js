@@ -146,3 +146,64 @@ test('closeの実行失敗は502', async t => {
   await markDone(f, 'DEMO-101');
   assert.equal((await postClose(f, '{"workspaceId":"w1AV"}')).status, 502);
 });
+
+const postFocus = (f, body, headers = {}) => fetch(`${f.url}/api/focus`,{method:'POST',headers:{'Content-Type':'application/json',...headers},body:typeof body === 'string' ? body : JSON.stringify(body)});
+test('重複行のboardは200を返し、pane focusはキャッシュによらず現在の所属を確認する', async t => {
+  const agents = JSON.parse(await readFile(new URL('./fixtures/agents.json',import.meta.url),'utf8'));
+  agents.result.agents.push({...agents.result.agents.find(a=>a.pane_id==='w1AV:p1')});
+  const f = await setup(t,{FAKE_HERDR_AGENTS:JSON.stringify(agents)});
+  const response = await fetch(`${f.url}/api/board`);
+  assert.equal(response.status,200);
+  const board = await response.json();
+  const task = board.columns.find(c=>c.key==='lost').cards.find(c=>c.id==='DEMO-101');
+  assert.equal(task.panes.filter(p=>p.role==='lead').length,2);
+  const before = (await readCalls(f.calls)).length;
+  assert.equal((await postFocus(f,{workspaceId:'w1AV',paneId:'w1AV:p2'})).status,204);
+  assert.deepEqual((await readCalls(f.calls)).slice(before),[['agent','list'],['agent','focus','w1AV:p2']]);
+  for (const body of [{workspaceId:'w1AV',paneId:'w1AV:p9'}, {workspaceId:'w1BB',paneId:'w1AV:p2'}]) {
+    const response = await postFocus(f,body);
+    assert.equal(response.status,404); assert.equal((await response.json()).error,'pane が見つかりません');
+  }
+  assert.equal((await readCalls(f.calls)).filter(args => args[1] === 'focus').length,1);
+});
+test('pane focusの入力検査は不正値とOrigin等をCLI実行前に拒否する', async t => {
+  const f = await setup(t);
+  for (const paneId of [null,42,{},[],['w1AV:p2'],'','--help','w1AV','w1AV:p2\n','w1AV:p2 extra']) {
+    const response = await postFocus(f,{workspaceId:'w1AV',paneId});
+    assert.equal(response.status,400); assert.equal((await response.json()).error,'paneId が不正です');
+  }
+  for (const [body,headers,status] of [
+    [{workspaceId:'w1AV',paneId:'w1AV:p2'},{Origin:'https://evil.example'},403],
+    [{workspaceId:'w1AV',paneId:'w1AV:p2'},{'Content-Type':'text/plain'},400],
+    [{workspaceId:'--help',paneId:'w1AV:p2'},{},400],
+    ['{',{},400],
+    [{workspaceId:'w1AV',paneId:'w1AV:p2',padding:'x'.repeat(4096)},{},400],
+  ]) assert.equal((await postFocus(f,body,headers)).status,status);
+  const hostStatus = await new Promise((resolve,reject) => {
+    const req = request(`${f.url}/api/focus`,{method:'POST',headers:{Host:'evil.example','Content-Type':'application/json'}},res=>{res.resume();resolve(res.statusCode);});
+    req.on('error',reject); req.end(JSON.stringify({workspaceId:'w1AV',paneId:'w1AV:p2'}));
+  });
+  assert.equal(hostStatus,403);
+  assert.deepEqual(await readCalls(f.calls),[]);
+});
+test('pane focusの一覧取得・解析失敗と実行失敗は502になる', async t => {
+  for (const env of [{FAKE_HERDR_FAIL:'agent'},{FAKE_HERDR_AGENTS:'{'},{FAKE_HERDR_AGENTS:JSON.stringify({result:{agents:[{workspace_id:'w1AV'}]}})},{FAKE_HERDR_FOCUS_FAIL:'1'}]) {
+    const f = await setup(t,env);
+    assert.equal((await postFocus(f,{workspaceId:'w1AV',paneId:'w1AV:p2'})).status,502);
+    assert.ok(!(await readCalls(f.calls)).some(args => args[0] === 'workspace'));
+  }
+});
+test('pane focusは正常終了でもerrorや壊れたJSONの応答を成功扱いしない', async t => {
+  assert.ok(app);
+  const source = await readFile(new URL('./fixtures/agents.json',import.meta.url),'utf8');
+  for (const stdout of ['{"error":{"code":"agent_not_found"}}','{']) {
+    let focused = false;
+    const server = app.createApp({readBoard:async()=>({}),herdr:{
+      list:async kind => {assert.equal(kind,'agent'); return {ok:true,stdout:source};},
+      focusPane:async id => {assert.equal(id,'w1AV:p2'); focused = true; return {ok:true,stdout};},
+    }});
+    server.listen(0,'127.0.0.1'); await once(server,'listening'); t.after(()=>new Promise(resolve=>server.close(resolve)));
+    const response = await postFocus({url:`http://127.0.0.1:${server.address().port}`},{workspaceId:'w1AV',paneId:'w1AV:p2'});
+    assert.equal(response.status,502); assert.equal(focused,true);
+  }
+});

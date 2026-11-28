@@ -53,3 +53,30 @@ test('子プロセスの失敗・不存在・タイムアウトを理由付き�
     const r = await cli.createHerdr(config).list('workspace'); assert.equal(r.ok,false); assert.ok(r.reason);
   }
 });
+
+test('focusPaneは不正なIDを実行前に拒否し、pane IDだけをagent focusに渡す', async t => {
+  const f = await setup(t);
+  assert.equal(typeof f.herdr.focusPane,'function');
+  for (const id of [null,42,{},['w1AV:p2'],'','--help','w1AV','w1AV:p2\n','w1AV:p2 extra']) {
+    assert.throws(() => f.herdr.focusPane(id), /pane ID が不正/);
+  }
+  assert.deepEqual(await readCalls(f.calls),[]);
+  const result = await f.herdr.focusPane('w1AV:p2');
+  assert.equal(result.ok,true); assert.equal(JSON.parse(result.stdout).result.agent.focused,true);
+  assert.deepEqual(await readCalls(f.calls),[['agent','focus','w1AV:p2']]);
+});
+test('focusPaneのHerdr実行失敗は理由付きで返る', async t => {
+  const f = await fixtureDirectory(t);
+  const herdr = cli.createHerdr({path:fakeHerdr,env:{...f.env,FAKE_HERDR_FOCUS_FAIL:'1'}});
+  assert.equal(typeof herdr.focusPane,'function');
+  const result = await herdr.focusPane('w1AV:p9');
+  assert.equal(result.ok,false); assert.match(result.reason,/agent_not_found/);
+});
+
+test('readAssetsはpane-viewをJavaScriptとして配信する', async () => {
+  const assets = await io.readAssets();
+  assert.ok(assets['/pane-view.js']);
+  assert.equal(assets['/pane-view.js'].type,'text/javascript; charset=utf-8');
+  const module = await import(`data:text/javascript;base64,${Buffer.from(assets['/pane-view.js'].body).toString('base64')}`);
+  assert.equal(module.paneView({paneId:'w1AV:p2',name:null,repo:'',role:'other',status:'idle',title:'',cwd:''}).heading,'w1AV:p2');
+});
