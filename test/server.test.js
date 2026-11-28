@@ -207,3 +207,33 @@ test('pane focusは正常終了でもerrorや壊れたJSONの応答を成功扱�
     assert.equal(response.status,502); assert.equal(focused,true);
   }
 });
+async function activatingApp(t, {activate, focusStdout = '{}'} = {}) {
+  const calls = [];
+  const herdr = {
+    list:async kind => ({ok:true, stdout:await readFile(new URL(`./fixtures/${kind}s.json`, import.meta.url),'utf8')}),
+    focus:async id => {calls.push(['focus', id]); return {ok:true, stdout:focusStdout};},
+    focusPane:async id => {calls.push(['focusPane', id]); return {ok:true, stdout:focusStdout};},
+  };
+  const terminal = {activate:async () => {calls.push(['activate']); return activate ? activate() : {ok:true};}};
+  const server = app.createApp({herdr, terminal, readBoard:async () => ({}), assets:{}});
+  server.listen(0,'127.0.0.1'); await once(server,'listening');
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  return {calls, url:`http://127.0.0.1:${server.address().port}`};
+}
+test('focus と pane focus が成功したら、そのあとでターミナルのアプリを前面に出す', async t => {
+  const f = await activatingApp(t);
+  assert.equal((await postFocus(f, {workspaceId:'w1BB'})).status, 204);
+  assert.equal((await postFocus(f, {workspaceId:'w1AV', paneId:'w1AV:p2'})).status, 204);
+  assert.deepEqual(f.calls, [['focus','w1BB'],['activate'],['focusPane','w1AV:p2'],['activate']]);
+});
+test('Herdr の focus が失敗したらアプリを前面に出さない', async t => {
+  const f = await activatingApp(t, {focusStdout:'{"error":"x"}'});
+  assert.equal((await postFocus(f, {workspaceId:'w1BB'})).status, 502);
+  assert.deepEqual(f.calls, [['focus','w1BB']]);
+});
+test('アプリを前面に出せなくても Herdr では移れているので 204 を返し、理由をログに残す', async t => {
+  const logged = t.mock.method(console, 'error', () => {});
+  const f = await activatingApp(t, {activate:() => ({ok:false, reason:'open: not found'})});
+  assert.equal((await postFocus(f, {workspaceId:'w1BB'})).status, 204);
+  assert.match(String(logged.mock.calls[0].arguments.join(' ')), /not found/);
+});

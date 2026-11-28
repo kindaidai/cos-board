@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { VALID_WORKSPACE, VALID_PANE, SKILL_WARNING } from '../contract.js';
 import { parseHerdr } from '../parse/herdr.js';
 
-export function createApp({readBoard, herdr, assets = {}, now = Date.now, checkSkill}) {
+export function createApp({readBoard, herdr, terminal, assets = {}, now = Date.now, checkSkill}) {
   let pending = null, cached = null, completedAt = -Infinity;
   function board() {
     if (pending) return pending;
@@ -71,6 +71,11 @@ export function createApp({readBoard, herdr, assets = {}, now = Date.now, checkS
       try {
         if (JSON.parse(result.stdout)?.error) return send(res,502,{error:`Herdr の ${verb} が失敗しました`});
       } catch {return send(res,502,{error:'Herdr の応答を解釈できません'});}
+      if (verb === 'focus' && terminal) {
+        // Herdr の中では移れているので、アプリを前面に出せなくても成功として返す。
+        const shown = await terminal.activate();
+        if (!shown.ok) console.error(`ターミナルのアプリを前面に出せません: ${shown.reason}`);
+      }
       return send(res,204);
     } catch (error) {
       console.error(error);

@@ -11,7 +11,8 @@ import { fixtureDirectory, fakeHerdr } from './helpers.js';
 const cli = await import('../src/io/options.js').catch(() => null);
 test('起動引数の既定値・port 0・不正値を検査する', () => {
   assert.ok(cli, 'options が未実装');
-  assert.deepEqual(cli.parseOptions([], '/home/test'),{port:4270,cosRoot:'/home/test/develop/.cos',herdrPath:'herdr',skillPath:'/home/test/.claude/skills/chief-of-staff/SKILL.md'});
+  assert.deepEqual(cli.parseOptions([], '/home/test'),{port:4270,cosRoot:'/home/test/develop/.cos',herdrPath:'herdr',skillPath:'/home/test/.claude/skills/chief-of-staff/SKILL.md',terminalApp:undefined});
+  assert.equal(cli.parseOptions(['--terminal-app','com.example.term']).terminalApp,'com.example.term');
   assert.equal(cli.parseOptions(['--skill-path','~/custom/SKILL.md'], '/home/test').skillPath, '/home/test/custom/SKILL.md');
   assert.equal(cli.parseOptions(['--port','0','--cos-root','/tmp/fixture','--herdr','/tmp/fake']).port,0);
   for (const args of [['--port','-1'],['--port','65536'],['--port','1e3'],['--port'],['--unknown','1']]) assert.throws(()=>cli.parseOptions(args));

@@ -10,7 +10,7 @@ export async function fixtureDirectory(t) {
   const root = join(directory, 'cos');
   await cp(new URL('./fixtures/cos', import.meta.url), root, {recursive: true});
   const calls = join(directory, 'calls.log');
-  return {directory, root, calls, env: {...process.env, FAKE_HERDR_CALLS: calls}};
+  return {directory, root, calls, env: {...process.env, FAKE_HERDR_CALLS: calls, COS_BOARD_TERMINAL_APP: 'none'}};
 }
 export async function readCalls(file) {
   try {return (await readFile(file, 'utf8')).trim().split('\n').filter(Boolean).map(line => JSON.parse(line));}
